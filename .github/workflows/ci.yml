@@ -125,9 +125,14 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
+    - name: Verify Docker Compose
+      run: |
+        docker compose version
+        echo "Docker Compose is available"
+
     - name: Test Docker Compose
       run: |
-        docker-compose -f docker-compose.yml config
+        docker compose -f docker-compose.yml config
         echo "Docker Compose configuration is valid"
 
   deploy:
