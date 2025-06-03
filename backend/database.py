@@ -18,7 +18,7 @@ class ConversationDB(Base):
 
 
 # Create engine and session
-engine = create_engine('sqlite:///conversations.db', echo=False)
+engine = create_engine("sqlite:///conversations.db", echo=False)
 Base.metadata.create_all(engine)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

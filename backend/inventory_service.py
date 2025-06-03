@@ -51,35 +51,69 @@ class InventoryService:
         """
         return [
             # Studio units - Entry level
-            Unit(unit_id="S104", beds=0, baths=1.0, sqft=450, rent=1500, available=True),
-            Unit(unit_id="S207", beds=0, baths=1.0, sqft=500, rent=1600, available=True),
-            Unit(unit_id="S310", beds=0, baths=1.0, sqft=475, rent=1550, available=True),
-
+            Unit(
+                unit_id="S104", beds=0, baths=1.0, sqft=450, rent=1500, available=True
+            ),
+            Unit(
+                unit_id="S207", beds=0, baths=1.0, sqft=500, rent=1600, available=True
+            ),
+            Unit(
+                unit_id="S310", beds=0, baths=1.0, sqft=475, rent=1550, available=True
+            ),
             # 1-bedroom units - Most popular
-            Unit(unit_id="A101", beds=1, baths=1.0, sqft=650, rent=1800, available=True),
-            Unit(unit_id="A205", beds=1, baths=1.0, sqft=700, rent=1900, available=True),
-            Unit(unit_id="A308", beds=1, baths=1.5, sqft=750, rent=2000, available=True),
-            Unit(unit_id="A412", beds=1, baths=1.0, sqft=675, rent=1850, available=True),
-
+            Unit(
+                unit_id="A101", beds=1, baths=1.0, sqft=650, rent=1800, available=True
+            ),
+            Unit(
+                unit_id="A205", beds=1, baths=1.0, sqft=700, rent=1900, available=True
+            ),
+            Unit(
+                unit_id="A308", beds=1, baths=1.5, sqft=750, rent=2000, available=True
+            ),
+            Unit(
+                unit_id="A412", beds=1, baths=1.0, sqft=675, rent=1850, available=True
+            ),
             # 2-bedroom units - Family friendly
-            Unit(unit_id="B301", beds=2, baths=2.0, sqft=950, rent=2400, available=True),
-            Unit(unit_id="B402", beds=2, baths=2.0, sqft=1000, rent=2500, available=True),
-            Unit(unit_id="B503", beds=2, baths=2.5, sqft=1100, rent=2700, available=True),
-            Unit(unit_id="B604", beds=2, baths=2.0, sqft=975, rent=2450, available=True),
-
+            Unit(
+                unit_id="B301", beds=2, baths=2.0, sqft=950, rent=2400, available=True
+            ),
+            Unit(
+                unit_id="B402", beds=2, baths=2.0, sqft=1000, rent=2500, available=True
+            ),
+            Unit(
+                unit_id="B503", beds=2, baths=2.5, sqft=1100, rent=2700, available=True
+            ),
+            Unit(
+                unit_id="B604", beds=2, baths=2.0, sqft=975, rent=2450, available=True
+            ),
             # 3-bedroom units - Spacious options
-            Unit(unit_id="C501", beds=3, baths=2.5, sqft=1200, rent=3200, available=True),
-            Unit(unit_id="C602", beds=3, baths=2.5, sqft=1250, rent=3300, available=False),  # Pre-reserved
-            Unit(unit_id="C703", beds=3, baths=3.0, sqft=1350, rent=3500, available=True),
-            Unit(unit_id="C804", beds=3, baths=2.5, sqft=1225, rent=3250, available=True),
-
+            Unit(
+                unit_id="C501", beds=3, baths=2.5, sqft=1200, rent=3200, available=True
+            ),
+            Unit(
+                unit_id="C602", beds=3, baths=2.5, sqft=1250, rent=3300, available=False
+            ),  # Pre-reserved
+            Unit(
+                unit_id="C703", beds=3, baths=3.0, sqft=1350, rent=3500, available=True
+            ),
+            Unit(
+                unit_id="C804", beds=3, baths=2.5, sqft=1225, rent=3250, available=True
+            ),
             # 4-bedroom units - Premium options
-            Unit(unit_id="D801", beds=4, baths=3.0, sqft=1600, rent=4200, available=True),
-            Unit(unit_id="D902", beds=4, baths=3.5, sqft=1750, rent=4500, available=True),
-            Unit(unit_id="D1003", beds=4, baths=3.0, sqft=1650, rent=4300, available=True),
+            Unit(
+                unit_id="D801", beds=4, baths=3.0, sqft=1600, rent=4200, available=True
+            ),
+            Unit(
+                unit_id="D902", beds=4, baths=3.5, sqft=1750, rent=4500, available=True
+            ),
+            Unit(
+                unit_id="D1003", beds=4, baths=3.0, sqft=1650, rent=4300, available=True
+            ),
         ]
 
-    def check_inventory(self, beds: int, preferred_unit_id: Optional[str] = None) -> Optional[Unit]:
+    def check_inventory(
+        self, beds: int, preferred_unit_id: Optional[str] = None
+    ) -> Optional[Unit]:
         """
         Check for available units with specified bedroom count.
 
@@ -95,8 +129,7 @@ class InventoryService:
         """
         # Find all units matching bedroom criteria
         available_units = [
-            unit for unit in self.units
-            if unit.beds == beds and unit.available
+            unit for unit in self.units if unit.beds == beds and unit.available
         ]
 
         if not available_units:
@@ -107,7 +140,7 @@ class InventoryService:
         if preferred_unit_id:
             preferred_unit = next(
                 (unit for unit in available_units if unit.unit_id == preferred_unit_id),
-                None
+                None,
             )
             if preferred_unit:
                 logger.info(f"Found preferred unit: {preferred_unit.unit_id}")
@@ -155,7 +188,9 @@ class InventoryService:
                 logger.info(f"Successfully reserved unit: {unit_id}")
                 return True
 
-        logger.warning(f"Failed to reserve unit: {unit_id} (not found or already reserved)")
+        logger.warning(
+            f"Failed to reserve unit: {unit_id} (not found or already reserved)"
+        )
         return False
 
     def get_unit_by_id(self, unit_id: str) -> Optional[Unit]:

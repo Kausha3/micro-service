@@ -29,13 +29,14 @@ class ChatState(str, Enum):
     Each state represents a specific step in the lead qualification process,
     ensuring proper data collection and conversation flow management.
     """
-    GREETING = "greeting"                    # Initial user greeting
-    COLLECTING_NAME = "collecting_name"      # Collecting prospect's name
-    COLLECTING_EMAIL = "collecting_email"    # Collecting email address
-    COLLECTING_PHONE = "collecting_phone"    # Collecting phone number
+
+    GREETING = "greeting"  # Initial user greeting
+    COLLECTING_NAME = "collecting_name"  # Collecting prospect's name
+    COLLECTING_EMAIL = "collecting_email"  # Collecting email address
+    COLLECTING_PHONE = "collecting_phone"  # Collecting phone number
     COLLECTING_MOVE_IN = "collecting_move_in"  # Collecting move-in date
-    COLLECTING_BEDS = "collecting_beds"      # Collecting bedroom preference
-    READY_TO_BOOK = "ready_to_book"         # Ready for tour booking
+    COLLECTING_BEDS = "collecting_beds"  # Collecting bedroom preference
+    READY_TO_BOOK = "ready_to_book"  # Ready for tour booking
     BOOKING_CONFIRMED = "booking_confirmed"  # Tour successfully booked
 
 
@@ -47,6 +48,7 @@ class ChatMessage(BaseModel):
         message (str): The user's message text
         session_id (Optional[str]): Session ID for conversation continuity
     """
+
     message: str
     session_id: Optional[str] = None
 
@@ -60,6 +62,7 @@ class ChatResponse(BaseModel):
         session_id (str): Session ID for tracking conversation
         state (Optional[ChatState]): Current conversation state
     """
+
     reply: str
     session_id: str
     state: Optional[ChatState] = None
@@ -81,6 +84,7 @@ class ProspectData(BaseModel):
         unit_id (Optional[str]): Reserved unit ID after booking
         property_address (Optional[str]): Property address (auto-populated)
     """
+
     name: Optional[str] = None
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
@@ -91,25 +95,29 @@ class ProspectData(BaseModel):
 
     def __init__(self, **data):
         """Initialize with auto-populated property address from environment."""
-        if 'property_address' not in data or data['property_address'] is None:
-            data['property_address'] = os.getenv("PROPERTY_ADDRESS", "123 Main St, Anytown, ST 12345")
+        if "property_address" not in data or data["property_address"] is None:
+            data["property_address"] = os.getenv(
+                "PROPERTY_ADDRESS", "123 Main St, Anytown, ST 12345"
+            )
         super().__init__(**data)
 
-    @validator('phone', allow_reuse=True)
+    @validator("phone", allow_reuse=True)
     def validate_phone(cls, v):
         if v is None:
             return v
         # Remove all non-digit characters
-        phone_digits = re.sub(r'\D', '', v)
+        phone_digits = re.sub(r"\D", "", v)
         # Check if it's a valid US phone number (10 digits)
         if len(phone_digits) == 10:
             return f"({phone_digits[:3]}) {phone_digits[3:6]}-{phone_digits[6:]}"
-        elif len(phone_digits) == 11 and phone_digits[0] == '1':
+        elif len(phone_digits) == 11 and phone_digits[0] == "1":
             return f"({phone_digits[1:4]}) {phone_digits[4:7]}-{phone_digits[7:]}"
         else:
-            raise ValueError("Please provide a valid 10-digit phone number (e.g., 555-123-4567)")
+            raise ValueError(
+                "Please provide a valid 10-digit phone number (e.g., 555-123-4567)"
+            )
 
-    @validator('move_in_date', allow_reuse=True)
+    @validator("move_in_date", allow_reuse=True)
     def validate_move_in_date(cls, v):
         if v is None:
             return v
@@ -117,18 +125,20 @@ class ProspectData(BaseModel):
         # Allow any string input for move-in date (natural language is fine)
         # The chat service handles the conversion and validation logic
         # Only validate if it's in strict YYYY-MM-DD format
-        if re.match(r'^\d{4}-\d{2}-\d{2}$', v):
+        if re.match(r"^\d{4}-\d{2}-\d{2}$", v):
             try:
                 # Validate it's a real date if in YYYY-MM-DD format
-                datetime.strptime(v, '%Y-%m-%d')
+                datetime.strptime(v, "%Y-%m-%d")
                 return v
             except ValueError:
-                raise ValueError("Invalid date format. If using YYYY-MM-DD format, please ensure it's a valid date.")
+                raise ValueError(
+                    "Invalid date format. If using YYYY-MM-DD format, please ensure it's a valid date."
+                )
 
         # Allow natural language inputs like "ASAP", "January 2024", "March 15th", etc.
         return v
 
-    @validator('beds_wanted', allow_reuse=True)
+    @validator("beds_wanted", allow_reuse=True)
     def validate_beds(cls, v):
         if v is None:
             return v
@@ -149,6 +159,7 @@ class ConversationMessage(BaseModel):
         text (str): Message content
         timestamp (datetime): When the message was sent
     """
+
     sender: str  # "user" or "bot"
     text: str
     timestamp: datetime
@@ -169,6 +180,7 @@ class ConversationSession(BaseModel):
         created_at (datetime): Session creation timestamp
         updated_at (datetime): Last update timestamp
     """
+
     session_id: str
     state: ChatState
     prospect_data: ProspectData
@@ -192,6 +204,7 @@ class Unit(BaseModel):
         rent (int): Monthly rent amount
         available (bool): Current availability status
     """
+
     unit_id: str
     beds: int
     baths: float
@@ -215,6 +228,7 @@ class TourConfirmation(BaseModel):
         tour_date (str): Scheduled tour date
         tour_time (str): Scheduled tour time
     """
+
     prospect_name: str
     prospect_email: EmailStr
     unit_id: str

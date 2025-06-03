@@ -28,8 +28,7 @@ load_dotenv()
 
 # Configure structured logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -39,17 +38,17 @@ app = FastAPI(
     description="Intelligent chat microservice for apartment leasing with automated lead qualification",
     version="1.0.0",
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
 )
 
 # Configure CORS middleware for cross-origin requests
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:3000",           # Local development frontend
-        "http://127.0.0.1:3000",          # Alternative local address
+        "http://localhost:3000",  # Local development frontend
+        "http://127.0.0.1:3000",  # Alternative local address
         "https://micro-service-frontend.onrender.com",  # Production deployment
-        os.getenv("FRONTEND_URL", "").strip()  # Custom frontend URL from environment
+        os.getenv("FRONTEND_URL", "").strip(),  # Custom frontend URL from environment
     ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE"],
@@ -87,11 +86,9 @@ async def global_exception_handler(request, exc):
         status_code=500,
         content={
             "detail": "An unexpected error occurred. Please try again.",
-            "type": "internal_server_error"
-        }
+            "type": "internal_server_error",
+        },
     )
-
-
 
 
 if __name__ == "__main__":
@@ -113,7 +110,7 @@ if __name__ == "__main__":
         "host": "0.0.0.0",
         "port": port,
         "reload": environment == "development",
-        "log_level": "info"
+        "log_level": "info",
     }
 
     logger.info(f"Starting server on port {port} in {environment} mode")

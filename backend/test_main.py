@@ -17,9 +17,7 @@ def test_root_endpoint():
 
 def test_chat_endpoint_basic():
     """Test basic chat functionality."""
-    response = client.post("/chat", json={
-        "message": "Hello"
-    })
+    response = client.post("/chat", json={"message": "Hello"})
     assert response.status_code == 200
     data = response.json()
     assert "reply" in data
@@ -31,17 +29,14 @@ def test_chat_endpoint_basic():
 def test_chat_endpoint_with_session():
     """Test chat with existing session ID."""
     # First message to get session ID
-    response1 = client.post("/chat", json={
-        "message": "Hello"
-    })
+    response1 = client.post("/chat", json={"message": "Hello"})
     assert response1.status_code == 200
     session_id = response1.json()["session_id"]
 
     # Second message with session ID
-    response2 = client.post("/chat", json={
-        "message": "My name is John",
-        "session_id": session_id
-    })
+    response2 = client.post(
+        "/chat", json={"message": "My name is John", "session_id": session_id}
+    )
     assert response2.status_code == 200
     data = response2.json()
     assert data["session_id"] == session_id
@@ -75,10 +70,9 @@ def test_chat_flow_name_collection():
     session_id = response1.json()["session_id"]
 
     # Provide name
-    response2 = client.post("/chat", json={
-        "message": "John Doe",
-        "session_id": session_id
-    })
+    response2 = client.post(
+        "/chat", json={"message": "John Doe", "session_id": session_id}
+    )
     assert response2.status_code == 200
     reply = response2.json()["reply"].lower()
     assert "email" in reply
@@ -90,16 +84,12 @@ def test_chat_flow_email_validation():
     response1 = client.post("/chat", json={"message": "Hello"})
     session_id = response1.json()["session_id"]
 
-    client.post("/chat", json={
-        "message": "John Doe",
-        "session_id": session_id
-    })
+    client.post("/chat", json={"message": "John Doe", "session_id": session_id})
 
     # Provide invalid email
-    response3 = client.post("/chat", json={
-        "message": "invalid-email",
-        "session_id": session_id
-    })
+    response3 = client.post(
+        "/chat", json={"message": "invalid-email", "session_id": session_id}
+    )
     assert response3.status_code == 200
     reply = response3.json()["reply"].lower()
     assert "valid email" in reply

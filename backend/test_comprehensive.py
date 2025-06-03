@@ -24,8 +24,12 @@ from unittest.mock import patch, MagicMock
 # Import application modules
 from main import app
 from models import (
-    ChatMessage, ProspectData, ConversationSession,
-    ChatState, ConversationMessage, TourConfirmation
+    ChatMessage,
+    ProspectData,
+    ConversationSession,
+    ChatState,
+    ConversationMessage,
+    TourConfirmation,
 )
 from chat_service import ChatService
 from email_service import EmailService
@@ -111,7 +115,7 @@ class TestDataModels:
             email="john@example.com",
             phone="5551234567",
             move_in_date="2024-03-15",
-            beds_wanted=2
+            beds_wanted=2,
         )
         assert prospect.name == "John Doe"
         assert prospect.email == "john@example.com"
@@ -125,7 +129,7 @@ class TestDataModels:
             ("(555) 123-4567", "(555) 123-4567"),
             ("555-123-4567", "(555) 123-4567"),
             ("555.123.4567", "(555) 123-4567"),
-            ("5551234567", "(555) 123-4567")
+            ("5551234567", "(555) 123-4567"),
         ]
 
         for input_phone, expected in test_cases:
@@ -151,7 +155,7 @@ class TestDataModels:
         message = ConversationMessage(
             sender="user",
             text="Hello, I'm looking for an apartment",
-            timestamp=datetime.now()
+            timestamp=datetime.now(),
         )
         assert message.sender == "user"
         assert message.text == "Hello, I'm looking for an apartment"
@@ -198,7 +202,9 @@ class TestConversationFlow:
         # Step 6: Bedroom preference
         message6 = ChatMessage(message="2", session_id=session_id)
         response6 = await chat_service.process_message(message6)
-        assert "unit" in response6.reply.lower() or "available" in response6.reply.lower()
+        assert (
+            "unit" in response6.reply.lower() or "available" in response6.reply.lower()
+        )
 
     @pytest.mark.asyncio
     async def test_natural_language_dates(self, chat_service):
@@ -212,7 +218,7 @@ class TestConversationFlow:
             "June 2025",
             "ASAP",
             "January 15, 2025",
-            "in 3 months"
+            "in 3 months",
         ]
 
         for date_input in natural_dates:
@@ -325,7 +331,7 @@ class TestEmailService:
         assert email_service.property_name is not None
         assert email_service.property_address is not None
 
-    @patch('smtplib.SMTP')
+    @patch("smtplib.SMTP")
     def test_send_tour_confirmation_success(self, mock_smtp, email_service):
         """Test successful email sending."""
         # Mock SMTP server
@@ -339,11 +345,12 @@ class TestEmailService:
             unit_id="A101",
             property_address="123 Main St",
             tour_date="Wednesday, June 04, 2025",
-            tour_time="2:00 PM"
+            tour_time="2:00 PM",
         )
 
         # Test email sending (use correct method name)
         import asyncio
+
         result = asyncio.run(email_service.send_tour_confirmation(confirmation))
 
         # Should return True for successful send
@@ -367,13 +374,13 @@ class TestDatabasePersistence:
             email="jane@example.com",
             phone="5551234567",
             move_in_date="2024-04-01",
-            beds_wanted=2
+            beds_wanted=2,
         )
 
         message = ConversationMessage(
             sender="user",
             text="I'm looking for a 2-bedroom apartment",
-            timestamp=datetime.now()
+            timestamp=datetime.now(),
         )
 
         session = ConversationSession(
@@ -382,7 +389,7 @@ class TestDatabasePersistence:
             prospect_data=prospect,
             messages=[message],
             created_at=datetime.now(),
-            updated_at=datetime.now()
+            updated_at=datetime.now(),
         )
 
         # Save session
@@ -394,7 +401,9 @@ class TestDatabasePersistence:
         assert loaded_session is not None
         assert loaded_session.prospect_data.name == "Jane Smith"
         assert len(loaded_session.messages) == 1
-        assert loaded_session.messages[0].text == "I'm looking for a 2-bedroom apartment"
+        assert (
+            loaded_session.messages[0].text == "I'm looking for a 2-bedroom apartment"
+        )
 
         # Clean up
         db_service.delete_session("test-session-123")

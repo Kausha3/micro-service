@@ -121,16 +121,36 @@ async def test_booking_intent_detection(chat_service):
     """Test enhanced booking intent detection."""
     # Test various booking keywords from the enhanced list
     booking_messages = [
-        "book", "yes", "schedule tour", "I want it", "interested in booking",
-        "tour", "visit", "appointment", "reserve", "confirm", "sure", "okay",
-        "want to book", "book a tour", "schedule a tour"
+        "book",
+        "yes",
+        "schedule tour",
+        "I want it",
+        "interested in booking",
+        "tour",
+        "visit",
+        "appointment",
+        "reserve",
+        "confirm",
+        "sure",
+        "okay",
+        "want to book",
+        "book a tour",
+        "schedule a tour",
     ]
 
     for msg in booking_messages:
         assert chat_service._is_booking_intent(msg.lower())
 
     # Test non-booking messages
-    non_booking_messages = ["hello", "maybe", "no thanks", "tell me more", "what", "how", "interested"]
+    non_booking_messages = [
+        "hello",
+        "maybe",
+        "no thanks",
+        "tell me more",
+        "what",
+        "how",
+        "interested",
+    ]
 
     for msg in non_booking_messages:
         assert not chat_service._is_booking_intent(msg.lower())
@@ -141,8 +161,19 @@ async def test_apartment_search_intent_detection(chat_service):
     """Test enhanced apartment search intent detection."""
     # Test various apartment search keywords
     apartment_messages = [
-        "apartment", "looking for", "show me", "bedroom", "2br", "3br",
-        "unit", "rent", "lease", "find", "available", "studio", "sqft"
+        "apartment",
+        "looking for",
+        "show me",
+        "bedroom",
+        "2br",
+        "3br",
+        "unit",
+        "rent",
+        "lease",
+        "find",
+        "available",
+        "studio",
+        "sqft",
     ]
 
     for msg in apartment_messages:
@@ -172,15 +203,23 @@ async def test_booking_intent_in_greeting_state(chat_service):
     assert session.state == ChatState.COLLECTING_NAME
 
     # Test other booking phrases in greeting state
-    booking_phrases = ["I want to book", "schedule a tour", "book", "interested in booking"]
+    booking_phrases = [
+        "I want to book",
+        "schedule a tour",
+        "book",
+        "interested in booking",
+    ]
 
     for phrase in booking_phrases:
         message = ChatMessage(message=phrase)
         response = await chat_service.process_message(message)
 
         # Should recognize booking intent and ask for name
-        assert ("book" in response.reply.lower() or "tour" in response.reply.lower() or
-                "help" in response.reply.lower())
+        assert (
+            "book" in response.reply.lower()
+            or "tour" in response.reply.lower()
+            or "help" in response.reply.lower()
+        )
         assert "name" in response.reply.lower()
 
         # Check session state - should move to COLLECTING_NAME for booking intent
@@ -242,7 +281,10 @@ async def test_beds_collection_with_alternatives(chat_service):
     response6 = await chat_service.process_message(message6)
 
     # Should either find a unit or say none available
-    assert ("found" in response6.reply.lower() or "don't currently have" in response6.reply.lower())
+    assert (
+        "found" in response6.reply.lower()
+        or "don't currently have" in response6.reply.lower()
+    )
 
 
 @pytest.mark.asyncio
@@ -256,17 +298,14 @@ async def test_data_validation_functions(chat_service):
         email="john@example.com",
         phone="5551234567",
         move_in_date="2025-07-01",
-        beds_wanted=2
+        beds_wanted=2,
     )
 
     assert chat_service._is_data_complete(complete_data)
     assert chat_service._get_missing_fields(complete_data) == []
 
     # Test incomplete data
-    incomplete_data = ProspectData(
-        name="John Doe",
-        email="john@example.com"
-    )
+    incomplete_data = ProspectData(name="John Doe", email="john@example.com")
 
     assert not chat_service._is_data_complete(incomplete_data)
     missing = chat_service._get_missing_fields(incomplete_data)
@@ -286,7 +325,7 @@ async def test_keyword_overlap_handling(chat_service):
 
     # Should handle this in greeting and ask for email (since it extracted the name from the message)
     # or ask for name if it didn't extract it properly
-    assert ("email" in response.reply.lower() or "name" in response.reply.lower())
+    assert "email" in response.reply.lower() or "name" in response.reply.lower()
 
     # Test that the same keywords outside greeting state work differently
     # Create a session in a different state
@@ -296,7 +335,9 @@ async def test_keyword_overlap_handling(chat_service):
     session.prospect_data.email = "john@example.com"
     chat_service.db_service.save_session(session)
 
-    message2 = ChatMessage(message="I'm looking for an apartment", session_id="test-session-overlap")
+    message2 = ChatMessage(
+        message="I'm looking for an apartment", session_id="test-session-overlap"
+    )
     response2 = await chat_service.process_message(message2)
 
     # Should acknowledge apartment search but continue with phone collection

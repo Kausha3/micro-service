@@ -27,6 +27,7 @@ async def test_email_config():
     # For testing, we'll just check that the method runs without error
     assert isinstance(is_valid, bool)
 
+
 @pytest.mark.asyncio
 async def test_smtp_connection():
     """Test basic SMTP connection without sending email."""
@@ -48,7 +49,7 @@ async def test_smtp_connection():
             start_tls=True,
             username=service.smtp_email,
             password=service.smtp_password,
-            tls_context=context
+            tls_context=context,
         )
 
         await smtp.connect()

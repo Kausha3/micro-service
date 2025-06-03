@@ -24,9 +24,13 @@ class EmailService:
         self.smtp_password = os.getenv("SMTP_PASSWORD", "your-app-password")
         self.smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
         self.smtp_port = int(os.getenv("SMTP_PORT", "587"))
-        self.property_address = os.getenv("PROPERTY_ADDRESS", "123 Main St, Anytown, ST 12345")
+        self.property_address = os.getenv(
+            "PROPERTY_ADDRESS", "123 Main St, Anytown, ST 12345"
+        )
         self.leasing_office_phone = os.getenv("LEASING_OFFICE_PHONE", "(555) 123-4567")
-        self.property_name = os.getenv("PROPERTY_NAME", "Luxury Apartments at Main Street")
+        self.property_name = os.getenv(
+            "PROPERTY_NAME", "Luxury Apartments at Main Street"
+        )
 
     async def send_tour_confirmation(self, confirmation: TourConfirmation) -> bool:
         """
@@ -58,6 +62,7 @@ class EmailService:
 
             # Send email
             import ssl
+
             context = ssl.create_default_context()
             context.check_hostname = False
             context.verify_mode = ssl.CERT_NONE
@@ -72,7 +77,9 @@ class EmailService:
                 tls_context=context,
             )
 
-            logger.info(f"Tour confirmation email sent to {confirmation.prospect_email}")
+            logger.info(
+                f"Tour confirmation email sent to {confirmation.prospect_email}"
+            )
             return True
 
         except aiosmtplib.SMTPAuthenticationError as e:
@@ -81,7 +88,9 @@ class EmailService:
             logger.error("1. 2-Factor Authentication is enabled on your Gmail account")
             logger.error("2. You're using an App Password (not your regular password)")
             logger.error("3. The App Password has no spaces")
-            logger.error("4. 'Less secure app access' is enabled (if not using App Password)")
+            logger.error(
+                "4. 'Less secure app access' is enabled (if not using App Password)"
+            )
             return False
         except aiosmtplib.SMTPException as e:
             logger.error(f"SMTP error occurred: {str(e)}")
@@ -113,7 +122,9 @@ class EmailService:
 
         # Check for common App Password format issues
         if " " in self.smtp_password:
-            logger.warning("SMTP_PASSWORD contains spaces - this may cause authentication issues")
+            logger.warning(
+                "SMTP_PASSWORD contains spaces - this may cause authentication issues"
+            )
 
         return True
 

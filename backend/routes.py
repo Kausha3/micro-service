@@ -34,8 +34,8 @@ async def root():
             "Natural language conversation",
             "Automated lead qualification",
             "Email notifications",
-            "Session persistence"
-        ]
+            "Session persistence",
+        ],
     }
 
 
@@ -59,12 +59,16 @@ async def chat_endpoint(message: ChatMessage):
         HTTPException: 500 if message processing fails
     """
     try:
-        logger.info(f"Processing message: '{message.message[:50]}{'...' if len(message.message) > 50 else ''}'")
+        logger.info(
+            f"Processing message: '{message.message[:50]}{'...' if len(message.message) > 50 else ''}'"
+        )
 
         # Process message through intelligent chat service
         response = await chat_service.process_message(message)
 
-        logger.info(f"Generated response: '{response.reply[:50]}{'...' if len(response.reply) > 50 else ''}'")
+        logger.info(
+            f"Generated response: '{response.reply[:50]}{'...' if len(response.reply) > 50 else ''}'"
+        )
 
         return response
 
@@ -72,7 +76,7 @@ async def chat_endpoint(message: ChatMessage):
         logger.error(f"Error processing chat message: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail="An error occurred while processing your message. Please try again."
+            detail="An error occurred while processing your message. Please try again.",
         )
 
 
@@ -94,7 +98,7 @@ async def get_inventory():
         return {
             "available_units": units,
             "total_units": len(units),
-            "timestamp": "2025-01-03T01:57:00Z"  # Current timestamp would be dynamic
+            "timestamp": "2025-01-03T01:57:00Z",  # Current timestamp would be dynamic
         }
     except Exception as e:
         logger.error(f"Error fetching inventory: {str(e)}", exc_info=True)
@@ -126,7 +130,7 @@ async def get_session(session_id: str):
                 "prospect_data": session.prospect_data.dict(),
                 "message_count": len(session.messages),
                 "created_at": session.created_at.isoformat(),
-                "updated_at": session.updated_at.isoformat()
+                "updated_at": session.updated_at.isoformat(),
             }
         else:
             raise HTTPException(status_code=404, detail="Session not found")

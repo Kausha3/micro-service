@@ -37,20 +37,24 @@ class SessionDatabaseService:
             db = self.db_session_factory()
 
             # Check if session already exists
-            existing = db.query(ConversationDB).filter(
-                ConversationDB.id == session.session_id
-            ).first()
+            existing = (
+                db.query(ConversationDB)
+                .filter(ConversationDB.id == session.session_id)
+                .first()
+            )
 
             # Serialize prospect_data and messages to JSON
             prospect_data_json = session.prospect_data.json()
-            messages_json = json.dumps([
-                {
-                    "sender": msg.sender,
-                    "text": msg.text,
-                    "timestamp": msg.timestamp.isoformat()
-                }
-                for msg in session.messages
-            ])
+            messages_json = json.dumps(
+                [
+                    {
+                        "sender": msg.sender,
+                        "text": msg.text,
+                        "timestamp": msg.timestamp.isoformat(),
+                    }
+                    for msg in session.messages
+                ]
+            )
 
             if existing:
                 # Update existing session
@@ -66,7 +70,7 @@ class SessionDatabaseService:
                     prospect_data=prospect_data_json,
                     messages=messages_json,
                     created_at=session.created_at,
-                    updated_at=session.updated_at
+                    updated_at=session.updated_at,
                 )
                 db.add(db_session)
 
@@ -77,7 +81,7 @@ class SessionDatabaseService:
 
         except Exception as e:
             logger.error(f"Failed to save session {session.session_id}: {str(e)}")
-            if 'db' in locals():
+            if "db" in locals():
                 db.rollback()
                 db.close()
             return False
@@ -95,9 +99,9 @@ class SessionDatabaseService:
         try:
             db = self.db_session_factory()
 
-            db_session = db.query(ConversationDB).filter(
-                ConversationDB.id == session_id
-            ).first()
+            db_session = (
+                db.query(ConversationDB).filter(ConversationDB.id == session_id).first()
+            )
 
             if not db_session:
                 db.close()
@@ -112,7 +116,7 @@ class SessionDatabaseService:
                 ConversationMessage(
                     sender=msg["sender"],
                     text=msg["text"],
-                    timestamp=datetime.fromisoformat(msg["timestamp"])
+                    timestamp=datetime.fromisoformat(msg["timestamp"]),
                 )
                 for msg in messages_data
             ]
@@ -124,7 +128,7 @@ class SessionDatabaseService:
                 prospect_data=prospect_data,
                 messages=messages,
                 created_at=db_session.created_at,
-                updated_at=db_session.updated_at
+                updated_at=db_session.updated_at,
             )
 
             db.close()
@@ -133,7 +137,7 @@ class SessionDatabaseService:
 
         except Exception as e:
             logger.error(f"Failed to load session {session_id}: {str(e)}")
-            if 'db' in locals():
+            if "db" in locals():
                 db.close()
             return None
 
@@ -150,9 +154,9 @@ class SessionDatabaseService:
         try:
             db = self.db_session_factory()
 
-            db_session = db.query(ConversationDB).filter(
-                ConversationDB.id == session_id
-            ).first()
+            db_session = (
+                db.query(ConversationDB).filter(ConversationDB.id == session_id).first()
+            )
 
             if db_session:
                 db.delete(db_session)
@@ -168,7 +172,7 @@ class SessionDatabaseService:
 
         except Exception as e:
             logger.error(f"Failed to delete session {session_id}: {str(e)}")
-            if 'db' in locals():
+            if "db" in locals():
                 db.rollback()
                 db.close()
             return False
@@ -186,16 +190,17 @@ class SessionDatabaseService:
         try:
             db = self.db_session_factory()
 
-            exists = db.query(ConversationDB).filter(
-                ConversationDB.id == session_id
-            ).first() is not None
+            exists = (
+                db.query(ConversationDB).filter(ConversationDB.id == session_id).first()
+                is not None
+            )
 
             db.close()
             return exists
 
         except Exception as e:
             logger.error(f"Failed to check session existence {session_id}: {str(e)}")
-            if 'db' in locals():
+            if "db" in locals():
                 db.close()
             return False
 
