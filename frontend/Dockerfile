@@ -1,5 +1,5 @@
 # Multi-stage build for frontend
-FROM node:18-alpine as builder
+FROM node:18-alpine AS builder
 
 # Set working directory
 WORKDIR /app
@@ -7,8 +7,8 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production
+# Install dependencies (including dev dependencies needed for build)
+RUN npm ci
 
 # Copy source code
 COPY . .
@@ -22,18 +22,20 @@ FROM nginx:alpine
 # Copy built assets from builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Copy custom nginx configuration if needed
-# COPY nginx.conf /etc/nginx/nginx.conf
+# Copy custom nginx configuration
+COPY nginx.conf /etc/nginx/nginx.conf
 
 # Create a non-root user for security
 RUN addgroup -g 1001 -S nodejs \
     && adduser -S nextjs -u 1001
 
-# Set proper permissions
+# Set proper permissions for nginx directories
 RUN chown -R nextjs:nodejs /usr/share/nginx/html \
     && chown -R nextjs:nodejs /var/cache/nginx \
     && chown -R nextjs:nodejs /var/log/nginx \
-    && chown -R nextjs:nodejs /etc/nginx/conf.d
+    && chown -R nextjs:nodejs /etc/nginx/conf.d \
+    && touch /var/run/nginx.pid \
+    && chown nextjs:nodejs /var/run/nginx.pid
 
 # Switch to non-root user
 USER nextjs
