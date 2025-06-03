@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import axios from 'axios'
 import './ChatWidget.css'
 
@@ -10,7 +10,6 @@ function ChatWidget() {
   const [isLoading, setIsLoading] = useState(false)
   const [sessionId, setSessionId] = useState(null)
   const [error, setError] = useState(null)
-  const [isInitialized, setIsInitialized] = useState(false)
   const messagesEndRef = useRef(null)
   const textareaRef = useRef(null)
 
@@ -72,13 +71,13 @@ function ChatWidget() {
   }
 
   // Focus textarea helper
-  const focusTextarea = () => {
+  const focusTextarea = useCallback(() => {
     setTimeout(() => {
       if (textareaRef.current && !isLoading) {
         textareaRef.current.focus()
       }
     }, 100)
-  }
+  }, [isLoading])
 
   useEffect(() => {
     scrollToBottom()
@@ -94,7 +93,7 @@ function ChatWidget() {
     if (!isLoading) {
       focusTextarea()
     }
-  }, [isLoading])
+  }, [isLoading, focusTextarea])
 
   // Initialize chat with welcome message or restore from storage
   useEffect(() => {
@@ -110,7 +109,6 @@ function ChatWidget() {
           console.log('Restoring session from localStorage:', storedSession.sessionId)
           setSessionId(storedSession.sessionId)
           setMessages(storedSession.messages)
-          setIsInitialized(true)
 
           // Verify session is still valid on the backend
           try {
@@ -152,14 +150,13 @@ function ChatWidget() {
 
       setSessionId(newSessionId)
       setMessages(initialMessages)
-      setIsInitialized(true)
 
       // Save to storage
       saveSessionToStorage(newSessionId, initialMessages)
     }
 
     initializeChat()
-  }, [])
+  }, [focusTextarea])
 
   const sendMessage = async () => {
     if (!inputValue.trim() || isLoading) return
@@ -363,7 +360,7 @@ function ChatWidget() {
         </div>
         
         <div className="chat-hints">
-          <span>💡 Try: "I'm looking for a 2-bedroom apartment" or "book a tour"</span>
+          <span>💡 Try: &ldquo;I&apos;m looking for a 2-bedroom apartment&rdquo; or &ldquo;book a tour&rdquo;</span>
         </div>
       </div>
     </div>
