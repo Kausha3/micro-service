@@ -115,6 +115,16 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
     
+    - name: Build fullstack Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile.fullstack
+        push: false
+        tags: lead-to-lease-fullstack:test
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
     - name: Test Docker Compose
       run: |
         docker-compose -f docker-compose.yml config
