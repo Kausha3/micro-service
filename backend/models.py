@@ -14,7 +14,7 @@ Author: Augment Agent
 Version: 1.0.0
 """
 
-from pydantic import BaseModel, EmailStr, validator
+from pydantic import BaseModel, EmailStr, field_validator
 from typing import Optional
 from datetime import datetime
 from enum import Enum
@@ -101,7 +101,8 @@ class ProspectData(BaseModel):
             )
         super().__init__(**data)
 
-    @validator("phone", allow_reuse=True)
+    @field_validator("phone")
+    @classmethod
     def validate_phone(cls, v):
         if v is None:
             return v
@@ -117,7 +118,8 @@ class ProspectData(BaseModel):
                 "Please provide a valid 10-digit phone number (e.g., 555-123-4567)"
             )
 
-    @validator("move_in_date", allow_reuse=True)
+    @field_validator("move_in_date")
+    @classmethod
     def validate_move_in_date(cls, v):
         if v is None:
             return v
@@ -138,7 +140,8 @@ class ProspectData(BaseModel):
         # Allow natural language inputs like "ASAP", "January 2024", "March 15th", etc.
         return v
 
-    @validator("beds_wanted", allow_reuse=True)
+    @field_validator("beds_wanted")
+    @classmethod
     def validate_beds(cls, v):
         if v is None:
             return v

@@ -44,7 +44,7 @@ class SessionDatabaseService:
             )
 
             # Serialize prospect_data and messages to JSON
-            prospect_data_json = session.prospect_data.json()
+            prospect_data_json = session.prospect_data.model_dump_json()
             messages_json = json.dumps(
                 [
                     {
@@ -108,7 +108,7 @@ class SessionDatabaseService:
                 return None
 
             # Deserialize prospect_data from JSON
-            prospect_data = ProspectData.parse_raw(db_session.prospect_data)
+            prospect_data = ProspectData.model_validate_json(db_session.prospect_data)
 
             # Deserialize messages from JSON
             messages_data = json.loads(db_session.messages)

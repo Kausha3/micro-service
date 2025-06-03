@@ -127,7 +127,7 @@ async def get_session(session_id: str):
             return {
                 "session_id": session.session_id,
                 "state": session.state.value,  # Convert enum to string
-                "prospect_data": session.prospect_data.dict(),
+                "prospect_data": session.prospect_data.model_dump(),
                 "message_count": len(session.messages),
                 "created_at": session.created_at.isoformat(),
                 "updated_at": session.updated_at.isoformat(),
