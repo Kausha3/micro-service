@@ -206,12 +206,24 @@ npm run build  # Tests build process
 
 ### **Docker Tests**
 ```bash
+# Test Docker builds locally (recommended before pushing)
+./scripts/test-docker-builds.sh
+
 # Validate Docker configuration
 docker-compose config
 
 # Run tests in container
 docker-compose run backend pytest -v
 ```
+
+### **Troubleshooting Docker Builds**
+
+If you encounter GitHub Actions cache errors (502 Bad Gateway), see our comprehensive [Docker Troubleshooting Guide](docs/DOCKER_TROUBLESHOOTING.md).
+
+**Quick fixes:**
+- Use the no-cache workflow: `.github/workflows/ci-no-cache.yml`
+- Test builds locally: `./scripts/test-docker-builds.sh`
+- Check [GitHub Status](https://www.githubstatus.com/) for service issues
 
 ---
 
