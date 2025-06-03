@@ -1,0 +1,139 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-backend:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('backend/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
+    - name: Install dependencies
+      working-directory: ./backend
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Lint with flake8
+      working-directory: ./backend
+      run: |
+        pip install flake8
+        # Stop the build if there are Python syntax errors or undefined names
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # Exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    
+    - name: Format check with black
+      working-directory: ./backend
+      run: |
+        pip install black
+        black --check --diff .
+    
+    - name: Run tests with pytest
+      working-directory: ./backend
+      run: |
+        pytest -v --tb=short
+      env:
+        SMTP_EMAIL: test@example.com
+        SMTP_PASSWORD: test-password
+        PROPERTY_ADDRESS: Test Property Address
+        PROPERTY_NAME: Test Property
+        LEASING_OFFICE_PHONE: (555) 123-4567
+
+  test-frontend:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    
+    - name: Install dependencies
+      working-directory: ./frontend
+      run: npm ci
+    
+    - name: Lint frontend
+      working-directory: ./frontend
+      run: npm run lint
+    
+    - name: Build frontend
+      working-directory: ./frontend
+      run: npm run build
+      env:
+        VITE_API_URL: http://localhost:8000
+
+  build-and-test-docker:
+    runs-on: ubuntu-latest
+    needs: [test-backend, test-frontend]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Build backend Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./backend
+        file: ./backend/Dockerfile
+        push: false
+        tags: lead-to-lease-backend:test
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+    
+    - name: Build frontend Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./frontend
+        file: ./frontend/Dockerfile
+        push: false
+        tags: lead-to-lease-frontend:test
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+    
+    - name: Test Docker Compose
+      run: |
+        docker-compose -f docker-compose.yml config
+        echo "Docker Compose configuration is valid"
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [test-backend, test-frontend, build-and-test-docker]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Deploy to production
+      run: |
+        echo "Deployment step would go here"
+        echo "This could deploy to Render, AWS, or other cloud providers"
+        # Example deployment commands:
+        # - Build and push Docker images to registry
+        # - Update Kubernetes deployments
+        # - Trigger Render deployment
+        # - Update environment variables

@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: lead-to-lease-chat
+    env: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: oregon
+    branch: main
+    healthCheckPath: /
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: SMTP_EMAIL
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_SERVER
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: 587
+      - key: PROPERTY_ADDRESS
+        value: "123 Luxury Lane, Downtown District, NY 10001"
