@@ -44,8 +44,8 @@ jobs:
     - name: Format check with black
       working-directory: ./backend
       run: |
-        pip install black
-        black --check --diff .
+        pip install black==25.1.0
+        black --check --diff --line-length=88 --target-version=py310 .
 
     - name: Run tests with pytest
       working-directory: ./backend

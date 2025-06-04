@@ -5,7 +5,7 @@
 repos:
   # General file checks
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0
+    rev: v5.0.0
     hooks:
       - id: trailing-whitespace
         description: Trim trailing whitespace
@@ -29,7 +29,7 @@ repos:
 
   # Python code formatting with Black
   - repo: https://github.com/psf/black
-    rev: 23.12.1
+    rev: 25.1.0
     hooks:
       - id: black
         description: Format Python code with Black
@@ -38,7 +38,7 @@ repos:
 
   # Python import sorting with isort
   - repo: https://github.com/pycqa/isort
-    rev: 5.13.2
+    rev: 6.0.1
     hooks:
       - id: isort
         description: Sort Python imports
@@ -60,7 +60,7 @@ repos:
 
   # Python security checks with bandit
   - repo: https://github.com/pycqa/bandit
-    rev: 1.7.5
+    rev: 1.8.3
     hooks:
       - id: bandit
         description: Security linting for Python
@@ -69,7 +69,7 @@ repos:
 
   # Python type checking with mypy
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.8.0
+    rev: v1.16.0
     hooks:
       - id: mypy
         description: Static type checking for Python
@@ -79,7 +79,7 @@ repos:
 
   # JavaScript/TypeScript linting with ESLint
   - repo: https://github.com/pre-commit/mirrors-eslint
-    rev: v8.56.0
+    rev: v9.28.0
     hooks:
       - id: eslint
         description: Lint JavaScript/JSX files
@@ -109,7 +109,7 @@ repos:
 
   # YAML linting
   - repo: https://github.com/adrienverge/yamllint
-    rev: v1.33.0
+    rev: v1.37.1
     hooks:
       - id: yamllint
         description: Lint YAML files

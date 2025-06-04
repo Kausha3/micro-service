@@ -99,7 +99,9 @@ class EmailService:
         Send a tour confirmation email to the prospect with retry logic.
         Returns True if successful, False otherwise.
         """
-        logger.info("🚀 EMAIL SERVICE CALLED - Starting tour confirmation email process")
+        logger.info(
+            "🚀 EMAIL SERVICE CALLED - Starting tour confirmation email process"
+        )
         logger.info(f"   📧 Recipient: {confirmation.prospect_email}")
         logger.info(f"   🏠 Unit: {confirmation.unit_id}")
         logger.info(f"   👤 Prospect: {confirmation.prospect_name}")
@@ -559,7 +561,9 @@ Email: {self.smtp_email}
 
             # Log successful delivery with timestamp
             delivery_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            logger.info(f"🎉 MULTIPLE BOOKING EMAIL DELIVERY SUCCESS at {delivery_time}")
+            logger.info(
+                f"🎉 MULTIPLE BOOKING EMAIL DELIVERY SUCCESS at {delivery_time}"
+            )
             logger.info(f"   ✅ Recipient: {confirmation.prospect_email}")
             logger.info(f"   ✅ Units: {unit_list}")
             logger.info(

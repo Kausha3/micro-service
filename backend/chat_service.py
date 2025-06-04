@@ -1177,7 +1177,9 @@ You can also:
         session.prospect_data.selected_units.clear()
 
         if count > 0:
-            return f"✅ Cleared {count} selected units. You can now make new selections!"
+            return (
+                f"✅ Cleared {count} selected units. You can now make new selections!"
+            )
         else:
             return "You don't have any units selected."
 
