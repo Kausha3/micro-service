@@ -10,7 +10,8 @@ function ChatWidget() {
   const [isLoading, setIsLoading] = useState(false)
   const [sessionId, setSessionId] = useState(null)
   const [error, setError] = useState(null)
-  const [selectedUnits, setSelectedUnits] = useState([]) // Track selected units for multiple booking
+  // Track selected units for multiple booking
+  const [selectedUnits, setSelectedUnits] = useState([])
   const messagesEndRef = useRef(null)
   const textareaRef = useRef(null)
 
@@ -20,7 +21,7 @@ function ChatWidget() {
       const sessionData = {
         sessionId,
         messages,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       }
       localStorage.setItem('chat_session', JSON.stringify(sessionData))
     } catch (error) {
@@ -31,7 +32,9 @@ function ChatWidget() {
   const loadSessionFromStorage = () => {
     try {
       const stored = localStorage.getItem('chat_session')
-      if (!stored) return null
+      if (!stored) {
+        return null
+      }
 
       const sessionData = JSON.parse(stored)
 
@@ -100,21 +103,21 @@ function ChatWidget() {
   useEffect(() => {
     const initializeChat = async () => {
       try {
-        console.log('API_BASE_URL:', API_BASE_URL)
+        // console.log('API_BASE_URL:', API_BASE_URL)
 
         // Try to load existing session from storage
         const storedSession = loadSessionFromStorage()
 
         if (storedSession && storedSession.sessionId && storedSession.messages.length > 0) {
           // Restore existing session
-          console.log('Restoring session from localStorage:', storedSession.sessionId)
+          // console.log('Restoring session from localStorage:', storedSession.sessionId)
           setSessionId(storedSession.sessionId)
           setMessages(storedSession.messages)
 
           // Verify session is still valid on the backend
           try {
-            const response = await axios.get(`${API_BASE_URL}/sessions/${storedSession.sessionId}`)
-            console.log('Session verified on backend:', response.data)
+            await axios.get(`${API_BASE_URL}/sessions/${storedSession.sessionId}`)
+            // console.log('Session verified on backend:', response.data)
           } catch (sessionError) {
             console.warn('Stored session not found on backend, starting fresh:', sessionError)
             // If session doesn't exist on backend, clear storage and start fresh
@@ -136,7 +139,7 @@ function ChatWidget() {
 
     const startFreshSession = async () => {
       const response = await axios.post(`${API_BASE_URL}/chat`, {
-        message: 'Hello'
+        message: 'Hello',
       })
 
       const newSessionId = response.data.session_id
@@ -145,8 +148,8 @@ function ChatWidget() {
           id: 1,
           text: response.data.reply,
           sender: 'assistant',
-          timestamp: new Date().toISOString()
-        }
+          timestamp: new Date().toISOString(),
+        },
       ]
 
       setSessionId(newSessionId)
@@ -160,13 +163,15 @@ function ChatWidget() {
   }, [focusTextarea])
 
   const sendMessage = async () => {
-    if (!inputValue.trim() || isLoading) return
+    if (!inputValue.trim() || isLoading) {
+      return
+    }
 
     const userMessage = {
       id: Date.now(),
       text: inputValue.trim(),
       sender: 'user',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     }
 
     // Add user message immediately
@@ -178,7 +183,7 @@ function ChatWidget() {
     try {
       const response = await axios.post(`${API_BASE_URL}/chat`, {
         message: userMessage.text,
-        session_id: sessionId
+        session_id: sessionId,
       })
 
       // Add assistant response
@@ -186,7 +191,7 @@ function ChatWidget() {
         id: Date.now() + 1,
         text: response.data.reply,
         sender: 'assistant',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       }
 
       // Add assistant response to existing messages (user message already added)
@@ -212,7 +217,7 @@ function ChatWidget() {
         text: 'Sorry, I encountered an error. Please try again.',
         sender: 'assistant',
         timestamp: new Date().toISOString(),
-        isError: true
+        isError: true,
       }
       setMessages(prev => [...prev, errorMessage])
     } finally {
@@ -233,12 +238,16 @@ function ChatWidget() {
   }
 
   // Function to handle apartment listing clicks
-  const handleApartmentClick = async (unitInfo, bedBath, sqft, rent) => {
-    if (isLoading) return // Prevent clicks while loading
+  const handleApartmentClick = async (unitInfo, _bedBath, _sqft, _rent) => {
+    if (isLoading) {
+      return
+    } // Prevent clicks while loading
 
     // Extract unit ID from the unit info (e.g., "• Unit B301" -> "B301")
     const unitIdMatch = unitInfo.match(/Unit ([A-Z0-9]+)/)
-    if (!unitIdMatch) return
+    if (!unitIdMatch) {
+      return
+    }
 
     const unitId = unitIdMatch[1]
 
@@ -261,7 +270,7 @@ function ChatWidget() {
       id: Date.now(),
       text: bookingMessage,
       sender: 'user',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     }
 
     // Add user message immediately
@@ -272,7 +281,7 @@ function ChatWidget() {
     try {
       const response = await axios.post(`${API_BASE_URL}/chat`, {
         message: bookingMessage,
-        session_id: sessionId
+        session_id: sessionId,
       })
 
       // Add assistant response
@@ -280,7 +289,7 @@ function ChatWidget() {
         id: Date.now() + 1,
         text: response.data.reply,
         sender: 'assistant',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       }
 
       // Add assistant response to existing messages
@@ -313,7 +322,7 @@ function ChatWidget() {
         text: 'Sorry, I encountered an error selecting that apartment. Please try again.',
         sender: 'assistant',
         timestamp: new Date().toISOString(),
-        isError: true
+        isError: true,
       }
       setMessages(prev => [...prev, errorMessage])
     } finally {
@@ -334,7 +343,7 @@ function ChatWidget() {
 
       // Start fresh session
       const response = await axios.post(`${API_BASE_URL}/chat`, {
-        message: 'Hello'
+        message: 'Hello',
       })
 
       const newSessionId = response.data.session_id
@@ -343,8 +352,8 @@ function ChatWidget() {
           id: 1,
           text: response.data.reply,
           sender: 'assistant',
-          timestamp: new Date().toISOString()
-        }
+          timestamp: new Date().toISOString(),
+        },
       ]
 
       setSessionId(newSessionId)
@@ -366,7 +375,7 @@ function ChatWidget() {
   const formatTime = (timestamp) => {
     return new Date(timestamp).toLocaleTimeString([], {
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
     })
   }
 
@@ -396,26 +405,33 @@ function ChatWidget() {
 
             return (
               <div
-                key={index}
+                key={unitId || `apartment-${index}`}
                 className={`apartment-listing clickable ${isLoading ? 'loading' : ''} ${isSelected ? 'selected' : ''}`}
                 onClick={() => !isLoading && handleApartmentClick(unitInfo, bedBath, sqft, rent)}
-                title={isLoading ? "Processing..." : isSelected ? "Click to remove from selections" : "Click to add to selections"}
+                onKeyDown={(e) => {
+                  if ((e.key === 'Enter' || e.key === ' ') && !isLoading) {
+                    e.preventDefault()
+                    handleApartmentClick(unitInfo, bedBath, sqft, rent)
+                  }
+                }}
+                role="button"
+                tabIndex={0}
+                title={isLoading ? 'Processing...' : isSelected ? 'Click to remove from selections' : 'Click to add to selections'}
               >
                 <span className="unit-id">{unitInfo}</span>
                 <span className="bed-bath">{bedBath}</span>
                 <span className="sqft">{sqft}</span>
                 <span className="rent">{rent}</span>
                 <span className="click-hint">
-                  {isLoading ? "⏳ Processing..." :
-                   isSelected ? "✅ Selected" :
-                   "📋 Click to select"}
+                  {isLoading ? '⏳ Processing...' :
+                    isSelected ? '✅ Selected' :
+                      '📋 Click to select'}
                 </span>
               </div>
             )
           }
-        }
-        // Check for category headers like "• Studio Units | ..."
-        else if (part.match(/• [A-Za-z0-9\-\s]+ Units \|/)) {
+        } else if (part.match(/• [A-Za-z0-9\-\s]+ Units \|/)) {
+          // Check for category headers like "• Studio Units | ..."
           // This is a unit category summary - format it specially
           const listingParts = part.split(' | ')
           if (listingParts.length >= 4) {
@@ -425,7 +441,7 @@ function ChatWidget() {
             const rent = listingParts[3] // "$1,500-1,600/month"
 
             return (
-              <div key={index} className="apartment-listing category-listing">
+              <div key={categoryInfo || `category-${index}`} className="apartment-listing category-listing">
                 <span className="unit-id">{categoryInfo}</span>
                 <span className="bed-bath">{bedBath}</span>
                 <span className="sqft">{sqft}</span>
@@ -435,7 +451,7 @@ function ChatWidget() {
           }
         }
         // Regular text line
-        return part && <div key={index}>{part}</div>
+        return part && <div key={`text-${part.slice(0, 30).replace(/\s+/g, '-')}`}>{part}</div>
       })
     }
 
@@ -532,7 +548,10 @@ function ChatWidget() {
         </div>
 
         <div className="chat-hints">
-          <span>💡 Try: &ldquo;I&apos;m looking for a 2-bedroom apartment&rdquo; or click units to select multiple apartments</span>
+          <span>
+            💡 Try: &ldquo;I&apos;m looking for a 2-bedroom apartment&rdquo; or click units to select
+            multiple apartments
+          </span>
         </div>
       </div>
     </div>

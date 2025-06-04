@@ -70,7 +70,7 @@ Issues = "https://github.com/your-org/lead-to-lease-chat-concierge/issues"
 # Black code formatter configuration
 [tool.black]
 line-length = 88
-target-version = ['py310', 'py311', 'py312']
+target-version = ['py310', 'py311']
 include = '\.pyi?$'
 exclude = '''
 /(
