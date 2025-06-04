@@ -1,5 +1,5 @@
-# This is a convenience Dockerfile that builds the full stack application
-# It's identical to Dockerfile.fullstack but placed here for easier Docker builds
+# This Dockerfile builds the full stack application
+# It combines both frontend and backend into a single container
 
 # Multi-stage build for production deployment
 FROM node:18-alpine AS frontend-build

@@ -88,14 +88,14 @@ echo "=========================="
 build_and_test "./frontend" "./frontend/Dockerfile" "lead-to-lease-frontend:test" \
     "docker run --rm lead-to-lease-frontend:test nginx -v"
 
-# Build fullstack (if Dockerfile exists)
-if [ -f "./Dockerfile.fullstack" ]; then
+# Build fullstack (using root Dockerfile)
+if [ -f "./Dockerfile" ]; then
     echo ""
     echo "📦 Building Fullstack Image"
     echo "==========================="
-    build_and_test "." "./Dockerfile.fullstack" "lead-to-lease-fullstack:test" ""
+    build_and_test "." "./Dockerfile" "lead-to-lease-fullstack:test" ""
 else
-    print_warning "Dockerfile.fullstack not found, skipping fullstack build"
+    print_warning "Dockerfile not found, skipping fullstack build"
 fi
 
 # Test Docker Compose

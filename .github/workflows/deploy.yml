@@ -51,7 +51,7 @@ jobs:
 
     - name: Test Docker build
       run: |
-        docker build -f Dockerfile.fullstack -t lead-to-lease-test .
+        docker build -f Dockerfile -t lead-to-lease-test .
 
   deploy:
     needs: test
