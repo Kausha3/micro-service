@@ -37,10 +37,6 @@ In production environments, this service would integrate with:
 - **Booking Workflow**: Reserves units upon tour confirmation
 - **Inventory Tracking**: Maintains accurate availability status
 - **Alternative Suggestions**: Offers similar units when preferred options unavailable
-
-Author: Augment Agent
-Version: 1.0.0
-License: MIT
 """
 
 import logging

@@ -5,9 +5,6 @@ This module contains all FastAPI route declarations and handlers,
 separated from business logic for better maintainability.
 Framework-specific code is isolated here while business logic
 remains in dedicated service modules.
-
-Author: Augment Agent
-Version: 1.0.0
 """
 
 import logging

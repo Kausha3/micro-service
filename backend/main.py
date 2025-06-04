@@ -32,10 +32,6 @@ Requires environment variables for:
 - Property information (PROPERTY_ADDRESS, PROPERTY_NAME, LEASING_OFFICE_PHONE)
 - AI service (OPENAI_API_KEY)
 - Application settings (ENVIRONMENT, PORT, FRONTEND_URL)
-
-Author: Augment Agent
-Version: 1.0.0
-License: MIT
 """
 
 import logging

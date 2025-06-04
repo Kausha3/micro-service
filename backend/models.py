@@ -9,9 +9,6 @@ This module defines all Pydantic models used throughout the application:
 - Inventory and booking models
 
 All models include comprehensive validation and type safety.
-
-Author: Augment Agent
-Version: 1.0.0
 """
 
 import os
