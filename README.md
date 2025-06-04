@@ -581,7 +581,7 @@ Once running, visit:
 
 ### Demo Video
 
-<https://www.loom.com/share/43f885454f4c49f18bc8b487024b4a50?sid=27079bbb-69d8-4251-9016-b24078bc07c8>
+<https://www.loom.com/share/11074df072c74d37ace1ad75cd3a45ff?sid=39d748d0-eb17-4af1-bfb7-9bf286a916cf>
 
 ## 🤝 **Contributing**
 
