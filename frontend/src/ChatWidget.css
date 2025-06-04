@@ -21,6 +21,25 @@
   color: #333;
 }
 
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.selected-units-indicator {
+  background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  animation: fadeIn 0.3s ease-in;
+}
+
 .new-chat-button {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
@@ -96,6 +115,155 @@
   font-size: 14px;
   line-height: 1.4;
   word-wrap: break-word;
+}
+
+/* Apartment listing styles */
+.apartment-listing {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  margin: 4px 0;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 8px;
+  border-left: 3px solid #667eea;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-size: 13px;
+}
+
+.message.assistant .apartment-listing {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.apartment-listing .unit-id {
+  font-weight: 600;
+  color: #2c3e50;
+  min-width: 80px;
+}
+
+.apartment-listing .bed-bath {
+  color: #34495e;
+  font-weight: 500;
+  min-width: 90px;
+}
+
+.apartment-listing .sqft {
+  color: #7f8c8d;
+  min-width: 70px;
+}
+
+.apartment-listing .rent {
+  color: #27ae60;
+  font-weight: 600;
+  margin-left: auto;
+}
+
+/* Clickable apartment listing styles */
+.apartment-listing.clickable {
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.apartment-listing.clickable:hover {
+  background: rgba(102, 126, 234, 0.15);
+  border-left-color: #667eea;
+  transform: translateX(2px);
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+}
+
+.apartment-listing.clickable:active {
+  transform: translateX(1px);
+  box-shadow: 0 1px 4px rgba(102, 126, 234, 0.3);
+}
+
+.apartment-listing .click-hint {
+  font-size: 11px;
+  color: #667eea;
+  font-weight: 500;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  margin-left: 8px;
+}
+
+.apartment-listing.clickable:hover .click-hint {
+  opacity: 1;
+}
+
+/* Loading state for apartment listings */
+.apartment-listing.clickable.loading {
+  opacity: 0.7;
+  cursor: wait;
+  pointer-events: none;
+}
+
+.apartment-listing.clickable.loading .click-hint {
+  opacity: 1;
+  color: #f39c12;
+}
+
+/* Selected apartment listing styles */
+.apartment-listing.clickable.selected {
+  background: rgba(39, 174, 96, 0.15);
+  border-left-color: #27ae60;
+  box-shadow: 0 2px 8px rgba(39, 174, 96, 0.2);
+}
+
+.apartment-listing.clickable.selected:hover {
+  background: rgba(39, 174, 96, 0.25);
+  border-left-color: #27ae60;
+}
+
+.apartment-listing.clickable.selected .click-hint {
+  opacity: 1;
+  color: #27ae60;
+  font-weight: 600;
+}
+
+/* Category listing styles (for unit type summaries) */
+.apartment-listing.category-listing {
+  background: rgba(102, 126, 234, 0.1);
+  border-left: 3px solid #3498db;
+  font-weight: 500;
+  cursor: default; /* Category listings are not clickable */
+}
+
+.apartment-listing.category-listing .unit-id {
+  color: #3498db;
+  font-weight: 700;
+}
+
+/* Mobile responsive apartment listings */
+@media (max-width: 768px) {
+  .apartment-listing {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    padding: 10px;
+  }
+
+  .apartment-listing .unit-id,
+  .apartment-listing .bed-bath,
+  .apartment-listing .sqft,
+  .apartment-listing .rent {
+    min-width: auto;
+  }
+
+  .apartment-listing .rent {
+    margin-left: 0;
+    align-self: flex-end;
+  }
+
+  .apartment-listing .click-hint {
+    align-self: center;
+    margin-left: 0;
+    margin-top: 4px;
+  }
+
+  .apartment-listing.clickable:hover {
+    transform: none; /* Disable transform on mobile for better touch experience */
+  }
 }
 
 .message-time {

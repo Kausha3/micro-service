@@ -10,6 +10,7 @@ function ChatWidget() {
   const [isLoading, setIsLoading] = useState(false)
   const [sessionId, setSessionId] = useState(null)
   const [error, setError] = useState(null)
+  const [selectedUnits, setSelectedUnits] = useState([]) // Track selected units for multiple booking
   const messagesEndRef = useRef(null)
   const textareaRef = useRef(null)
 
@@ -231,6 +232,95 @@ function ChatWidget() {
     setInputValue(e.target.value)
   }
 
+  // Function to handle apartment listing clicks
+  const handleApartmentClick = async (unitInfo, bedBath, sqft, rent) => {
+    if (isLoading) return // Prevent clicks while loading
+
+    // Extract unit ID from the unit info (e.g., "• Unit B301" -> "B301")
+    const unitIdMatch = unitInfo.match(/Unit ([A-Z0-9]+)/)
+    if (!unitIdMatch) return
+
+    const unitId = unitIdMatch[1]
+
+    // Check if unit is already selected
+    const isAlreadySelected = selectedUnits.includes(unitId)
+
+    let bookingMessage
+    if (isAlreadySelected) {
+      // Remove from selection
+      setSelectedUnits(prev => prev.filter(id => id !== unitId))
+      bookingMessage = `Remove unit ${unitId} from my selections`
+    } else {
+      // Add to selection
+      setSelectedUnits(prev => [...prev, unitId])
+      bookingMessage = `Add unit ${unitId} to my selections`
+    }
+
+    // Create user message object
+    const userMessage = {
+      id: Date.now(),
+      text: bookingMessage,
+      sender: 'user',
+      timestamp: new Date().toISOString()
+    }
+
+    // Add user message immediately
+    setMessages(prev => [...prev, userMessage])
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      const response = await axios.post(`${API_BASE_URL}/chat`, {
+        message: bookingMessage,
+        session_id: sessionId
+      })
+
+      // Add assistant response
+      const assistantMessage = {
+        id: Date.now() + 1,
+        text: response.data.reply,
+        sender: 'assistant',
+        timestamp: new Date().toISOString()
+      }
+
+      // Add assistant response to existing messages
+      setMessages(prev => [...prev, assistantMessage])
+      const updatedMessages = [...messages, userMessage, assistantMessage]
+
+      // Update session ID if provided
+      const currentSessionId = response.data.session_id || sessionId
+      if (response.data.session_id) {
+        setSessionId(response.data.session_id)
+      }
+
+      // Save updated session to storage
+      saveSessionToStorage(currentSessionId, updatedMessages)
+
+    } catch (error) {
+      console.error('Failed to send apartment selection:', error)
+      setError('Failed to select apartment. Please try again.')
+
+      // Revert selection change on error
+      if (isAlreadySelected) {
+        setSelectedUnits(prev => [...prev, unitId])
+      } else {
+        setSelectedUnits(prev => prev.filter(id => id !== unitId))
+      }
+
+      // Add error message
+      const errorMessage = {
+        id: Date.now() + 1,
+        text: 'Sorry, I encountered an error selecting that apartment. Please try again.',
+        sender: 'assistant',
+        timestamp: new Date().toISOString(),
+        isError: true
+      }
+      setMessages(prev => [...prev, errorMessage])
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const startNewChat = async () => {
     try {
       setIsLoading(true)
@@ -274,24 +364,104 @@ function ChatWidget() {
   }
 
   const formatTime = (timestamp) => {
-    return new Date(timestamp).toLocaleTimeString([], { 
-      hour: '2-digit', 
-      minute: '2-digit' 
+    return new Date(timestamp).toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit'
     })
+  }
+
+  // Function to detect and format apartment listings
+  const formatMessageText = (text) => {
+    // Check if the message contains apartment listings with the new format
+    const apartmentListingRegex = /• Unit [A-Z0-9]+ \|/
+
+    if (apartmentListingRegex.test(text)) {
+      // Split the text into parts and format apartment listings
+      const parts = text.split('\n')
+      return parts.map((part, index) => {
+        // Check for apartment listing pattern
+        if (part.match(/• Unit [A-Z0-9]+ \|/)) {
+          // This is an apartment listing - format it specially
+          const listingParts = part.split(' | ')
+          if (listingParts.length >= 4) {
+            const unitInfo = listingParts[0] // "• Unit A101"
+            const bedBath = listingParts[1] // "1 bed/1 bath"
+            const sqft = listingParts[2] // "650 sq ft"
+            const rent = listingParts[3] // "$1,800/month"
+
+            // Extract unit ID to check if it's selected
+            const unitIdMatch = unitInfo.match(/Unit ([A-Z0-9]+)/)
+            const unitId = unitIdMatch ? unitIdMatch[1] : null
+            const isSelected = unitId && selectedUnits.includes(unitId)
+
+            return (
+              <div
+                key={index}
+                className={`apartment-listing clickable ${isLoading ? 'loading' : ''} ${isSelected ? 'selected' : ''}`}
+                onClick={() => !isLoading && handleApartmentClick(unitInfo, bedBath, sqft, rent)}
+                title={isLoading ? "Processing..." : isSelected ? "Click to remove from selections" : "Click to add to selections"}
+              >
+                <span className="unit-id">{unitInfo}</span>
+                <span className="bed-bath">{bedBath}</span>
+                <span className="sqft">{sqft}</span>
+                <span className="rent">{rent}</span>
+                <span className="click-hint">
+                  {isLoading ? "⏳ Processing..." :
+                   isSelected ? "✅ Selected" :
+                   "📋 Click to select"}
+                </span>
+              </div>
+            )
+          }
+        }
+        // Check for category headers like "• Studio Units | ..."
+        else if (part.match(/• [A-Za-z0-9\-\s]+ Units \|/)) {
+          // This is a unit category summary - format it specially
+          const listingParts = part.split(' | ')
+          if (listingParts.length >= 4) {
+            const categoryInfo = listingParts[0] // "• Studio Units"
+            const bedBath = listingParts[1] // "0 bed/1 bath"
+            const sqft = listingParts[2] // "450-500 sq ft"
+            const rent = listingParts[3] // "$1,500-1,600/month"
+
+            return (
+              <div key={index} className="apartment-listing category-listing">
+                <span className="unit-id">{categoryInfo}</span>
+                <span className="bed-bath">{bedBath}</span>
+                <span className="sqft">{sqft}</span>
+                <span className="rent">{rent}</span>
+              </div>
+            )
+          }
+        }
+        // Regular text line
+        return part && <div key={index}>{part}</div>
+      })
+    }
+
+    // Regular message - return as is
+    return text
   }
 
   return (
     <div className="chat-widget">
       <div className="chat-header">
         <h3>Chat Assistant</h3>
-        <button
-          onClick={startNewChat}
-          disabled={isLoading}
-          className="new-chat-button"
-          title="Start a new conversation"
-        >
-          🔄 New Chat
-        </button>
+        <div className="header-controls">
+          {selectedUnits.length > 0 && (
+            <div className="selected-units-indicator" title={`Selected units: ${selectedUnits.join(', ')}`}>
+              📋 {selectedUnits.length} selected
+            </div>
+          )}
+          <button
+            onClick={startNewChat}
+            disabled={isLoading}
+            className="new-chat-button"
+            title="Start a new conversation"
+          >
+            🔄 New Chat
+          </button>
+        </div>
       </div>
       <div className="chat-messages">
         {messages.map((message) => (
@@ -300,7 +470,7 @@ function ChatWidget() {
             className={`message ${message.sender} ${message.isError ? 'error' : ''}`}
           >
             <div className="message-content">
-              <div className="message-text">{message.text}</div>
+              <div className="message-text">{formatMessageText(message.text)}</div>
               <div className="message-time">{formatTime(message.timestamp)}</div>
             </div>
           </div>
@@ -362,7 +532,7 @@ function ChatWidget() {
         </div>
         
         <div className="chat-hints">
-          <span>💡 Try: &ldquo;I&apos;m looking for a 2-bedroom apartment&rdquo; or &ldquo;book a tour&rdquo;</span>
+          <span>💡 Try: &ldquo;I&apos;m looking for a 2-bedroom apartment&rdquo; or click units to select multiple apartments</span>
         </div>
       </div>
     </div>

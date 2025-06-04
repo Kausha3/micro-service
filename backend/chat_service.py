@@ -9,6 +9,8 @@ from models import (
     ProspectData,
     ConversationSession,
     TourConfirmation,
+    MultipleBookingConfirmation,
+    BookedUnit,
     ConversationMessage,
     AIContext,
 )
@@ -102,6 +104,22 @@ class ChatService:
         AI-driven conversation flow that can handle natural language queries.
         """
         try:
+            # PRIORITY: Handle unit selection commands FIRST before any other processing
+            if "add unit" in message.lower() and "to my selections" in message.lower():
+                add_match = re.search(r'add.*?unit\s+([a-z]\d{2,3}).*?to my selections', message.lower())
+                if add_match:
+                    unit_id = add_match.group(1).upper()
+                    return self._add_selected_unit(session, unit_id)
+            elif "remove unit" in message.lower() and "from my selections" in message.lower():
+                remove_match = re.search(r'remove.*?unit\s+([a-z]\d{2,3}).*?from my selections', message.lower())
+                if remove_match:
+                    unit_id = remove_match.group(1).upper()
+                    return self._remove_selected_unit(session, unit_id)
+            elif "show selected" in message.lower() or "my selections" in message.lower():
+                return self._show_selected_units(session)
+            elif "clear selections" in message.lower() or "remove all" in message.lower():
+                return self._clear_selected_units(session)
+
             # Check if booking is already confirmed
             if session.state == ChatState.BOOKING_CONFIRMED:
                 return await self._handle_post_booking_ai(session, message)
@@ -118,7 +136,15 @@ class ChatService:
 
                 if data_complete:
                     logger.info("🚀 All data complete - triggering booking flow")
-                    return await self._handle_booking_intent(session)
+
+                    # Check if this is a multiple booking request
+                    if (len(session.prospect_data.selected_units) > 1 or
+                        any(phrase in message.lower() for phrase in ["book all", "all units", "multiple units"])):
+                        logger.info("🎯 Multiple booking detected")
+                        return await self._handle_multiple_booking_intent(session)
+                    else:
+                        logger.info("🎯 Single booking detected")
+                        return await self._handle_booking_intent(session)
                 else:
                     missing_fields = self._get_missing_fields(session.prospect_data)
                     logger.warning(f"❌ Cannot book - missing fields: {missing_fields}")
@@ -129,7 +155,7 @@ class ChatService:
             self._parse_multiple_fields_from_message(session, message)
 
             # ENHANCED: Check for direct unit booking requests (e.g., "I want to book Unit B301")
-            unit_booking_match = re.search(r'(?:book|want|select|choose).*?unit\s+([A-Z]\d{2,3})', message.lower())
+            unit_booking_match = re.search(r'(?:book|want|select|choose).*?unit\s+([a-z]\d{2,3})', message.lower())
             if unit_booking_match:
                 unit_id = unit_booking_match.group(1).upper()
                 logger.info(f"🎯 Direct unit booking request detected: {unit_id}")
@@ -137,6 +163,12 @@ class ChatService:
                 # Get unit details to determine bedroom count
                 unit = inventory_service.get_unit_by_id(unit_id)
                 if unit and unit.available:
+                    # Add to selected units list for multiple booking support
+                    if unit_id not in session.prospect_data.selected_units:
+                        session.prospect_data.selected_units.append(unit_id)
+                        logger.info(f"   ✅ Added {unit_id} to selected units: {session.prospect_data.selected_units}")
+
+                    # Also maintain legacy unit_id field for backward compatibility
                     session.prospect_data.unit_id = unit_id
                     session.prospect_data.beds_wanted = unit.beds
                     logger.info(f"   ✅ Set unit_id to {unit_id} and beds_wanted to {unit.beds}")
@@ -145,6 +177,19 @@ class ChatService:
                     if any(keyword in message.lower() for keyword in ["book", "want to book"]):
                         session.ai_context.extracted_intents.append("booking_intent")
                         logger.info("   ✅ Added booking_intent to extracted_intents")
+
+            # ENHANCED: Check for multiple unit selection patterns
+            multiple_units_match = re.findall(r'unit\s+([a-z]\d{2,3})', message.lower())
+            if len(multiple_units_match) > 1:
+                logger.info(f"🎯 Multiple unit selection detected: {multiple_units_match}")
+                for unit_id in multiple_units_match:
+                    unit_id = unit_id.upper()
+                    unit = inventory_service.get_unit_by_id(unit_id)
+                    if unit and unit.available and unit_id not in session.prospect_data.selected_units:
+                        session.prospect_data.selected_units.append(unit_id)
+                        logger.info(f"   ✅ Added {unit_id} to selected units")
+
+
 
             # ADDITIONAL FIX: If user selected a studio unit, set beds_wanted to 0
             if not session.prospect_data.beds_wanted and "studio" in message.lower():
@@ -164,7 +209,14 @@ class ChatService:
             # If so, automatically trigger booking regardless of explicit booking intent
             if self._is_data_complete(session.prospect_data) and session.state != ChatState.BOOKING_CONFIRMED:
                 logger.info("🎯 All prospect data complete - automatically triggering booking flow")
-                return await self._handle_booking_intent(session)
+
+                # Check if this is a multiple booking request
+                if len(session.prospect_data.selected_units) > 1:
+                    logger.info("🎯 Multiple booking detected in auto-trigger")
+                    return await self._handle_multiple_booking_intent(session)
+                else:
+                    logger.info("🎯 Single booking detected in auto-trigger")
+                    return await self._handle_booking_intent(session)
 
             # ENHANCED: Check if AI response indicates booking completion
             if self._ai_indicates_booking_complete(ai_response) and session.state != ChatState.BOOKING_CONFIRMED:
@@ -172,7 +224,13 @@ class ChatService:
                 # Try to extract any remaining data from the conversation
                 await self._extract_data_from_conversation_history(session)
                 if self._is_data_complete(session.prospect_data):
-                    return await self._handle_booking_intent(session)
+                    # Check if this is a multiple booking request
+                    if len(session.prospect_data.selected_units) > 1:
+                        logger.info("🎯 Multiple booking detected in AI-triggered flow")
+                        return await self._handle_multiple_booking_intent(session)
+                    else:
+                        logger.info("🎯 Single booking detected in AI-triggered flow")
+                        return await self._handle_booking_intent(session)
                 else:
                     missing_fields = self._get_missing_fields(session.prospect_data)
                     logger.warning(f"❌ AI claims booking complete but missing: {missing_fields}")
@@ -456,21 +514,35 @@ class ChatService:
         logger.info(f"   Session ID: {session.session_id}")
         logger.info(f"   Prospect: {session.prospect_data.name}")
         logger.info(f"   Email: {session.prospect_data.email}")
+        logger.info(f"   Selected Units: {session.prospect_data.selected_units}")
+
+        # CRITICAL FIX: Check if this should be a multiple booking
+        if len(session.prospect_data.selected_units) > 1:
+            logger.info("🎯 Multiple units detected in single booking handler - redirecting to multiple booking")
+            return await self._handle_multiple_booking_intent(session)
 
         if not self._is_data_complete(session.prospect_data):
             missing_fields = self._get_missing_fields(session.prospect_data)
             logger.warning(f"❌ Booking failed - missing data: {missing_fields}")
             return f"I need a bit more information before booking. Missing: {', '.join(missing_fields)}"
 
-        # Check inventory again - use existing unit_id for consistency
-        preferred_unit_id = (
-            session.prospect_data.unit_id if session.prospect_data.unit_id else None
-        )
-        available_unit = inventory_service.check_inventory(
-            session.prospect_data.beds_wanted, preferred_unit_id
-        )
-        if not available_unit:
-            return "I'm sorry, that unit is no longer available. Let me check for other options."
+        # ENHANCED: Use selected_units if available, otherwise fall back to legacy unit_id
+        if session.prospect_data.selected_units:
+            # Use the first (and only) selected unit for single booking
+            unit_id = session.prospect_data.selected_units[0]
+            available_unit = inventory_service.get_unit_by_id(unit_id)
+            if not available_unit or not available_unit.available:
+                return f"I'm sorry, Unit {unit_id} is no longer available. Let me check for other options."
+        else:
+            # Fall back to legacy inventory check
+            preferred_unit_id = (
+                session.prospect_data.unit_id if session.prospect_data.unit_id else None
+            )
+            available_unit = inventory_service.check_inventory(
+                session.prospect_data.beds_wanted, preferred_unit_id
+            )
+            if not available_unit:
+                return "I'm sorry, that unit is no longer available. Let me check for other options."
 
         # Generate tour slot
         tour_date, tour_time = email_service.generate_tour_slot()
@@ -504,6 +576,10 @@ class ChatService:
             inventory_service.reserve_unit(available_unit.unit_id)
             session.prospect_data.unit_id = available_unit.unit_id
 
+            # CONSISTENCY FIX: Ensure unit is in selected_units list
+            if available_unit.unit_id not in session.prospect_data.selected_units:
+                session.prospect_data.selected_units.append(available_unit.unit_id)
+
             # Create response message with spam folder reminder
             notification_msg = (
                 f"I've sent a confirmation email to {session.prospect_data.email}. "
@@ -521,6 +597,10 @@ class ChatService:
             session.state = ChatState.BOOKING_CONFIRMED
             inventory_service.reserve_unit(available_unit.unit_id)
             session.prospect_data.unit_id = available_unit.unit_id
+
+            # CONSISTENCY FIX: Ensure unit is in selected_units list
+            if available_unit.unit_id not in session.prospect_data.selected_units:
+                session.prospect_data.selected_units.append(available_unit.unit_id)
 
             return (
                 f"✅ Your tour is confirmed for {tour_date} at {tour_time}! "
@@ -574,7 +654,7 @@ class ChatService:
     def _parse_multiple_fields_from_message(self, session: ConversationSession, message: str):
         """
         Parse multiple fields from a single user message.
-        Handles cases like: "John Doe, john@example.com, 5551234567, January 2025"
+        Handles cases like: "My name is Kausha, patermanav45@gmail.com 7272727272, Next month"
         """
         logger.info(f"🔍 Parsing multiple fields from message: '{message[:100]}...'")
 
@@ -584,41 +664,114 @@ class ChatService:
         if len(parts) >= 2:  # At least 2 parts to consider multi-field parsing
             logger.info(f"   Found {len(parts)} parts: {parts}")
 
+            # First pass: Extract specific field types with high confidence
             for i, part in enumerate(parts):
                 part = part.strip()
 
-                # Try to identify and parse each part
-                if not session.prospect_data.name and self._looks_like_name(part):
-                    session.prospect_data.name = part
-                    logger.info(f"   ✅ Parsed name: {part}")
-
-                elif not session.prospect_data.email and self._looks_like_email(part):
+                # Handle email detection first (most specific)
+                if not session.prospect_data.email and self._looks_like_email(part):
                     session.prospect_data.email = part.lower()
                     logger.info(f"   ✅ Parsed email: {part}")
+                    continue
 
-                elif not session.prospect_data.phone and self._looks_like_phone(part):
-                    # Clean and validate phone number
+                # Handle combined email+phone parts (e.g., "email@domain.com 1234567890")
+                if not session.prospect_data.email or not session.prospect_data.phone:
+                    email_phone_match = re.search(r'([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\s+(\d{10})', part)
+                    if email_phone_match:
+                        if not session.prospect_data.email:
+                            session.prospect_data.email = email_phone_match.group(1).lower()
+                            logger.info(f"   ✅ Parsed email from combined: {email_phone_match.group(1)}")
+                        if not session.prospect_data.phone:
+                            session.prospect_data.phone = email_phone_match.group(2)
+                            logger.info(f"   ✅ Parsed phone from combined: {email_phone_match.group(2)}")
+                        continue
+
+                # Handle phone detection (specific pattern)
+                if not session.prospect_data.phone and self._looks_like_phone(part):
                     cleaned_phone = re.sub(r'[^\d]', '', part)
                     if len(cleaned_phone) == 10:
                         session.prospect_data.phone = cleaned_phone
                         logger.info(f"   ✅ Parsed phone: {cleaned_phone}")
+                        continue
 
-                elif not session.prospect_data.move_in_date and self._looks_like_date(part):
-                    session.prospect_data.move_in_date = part
-                    logger.info(f"   ✅ Parsed move-in date: {part}")
+            # Second pass: Extract name and date with improved logic
+            for i, part in enumerate(parts):
+                part = part.strip()
 
-                elif not session.prospect_data.beds_wanted and self._looks_like_bedroom_count(part):
+                # Skip parts that were already processed as email/phone
+                if (session.prospect_data.email and session.prospect_data.email in part.lower()) or \
+                   (session.prospect_data.phone and session.prospect_data.phone in re.sub(r'[^\d]', '', part)):
+                    continue
+
+                # Handle name extraction with improved logic
+                if not session.prospect_data.name:
+                    extracted_name = self._extract_name_from_text(part)
+                    if extracted_name:
+                        session.prospect_data.name = extracted_name
+                        logger.info(f"   ✅ Parsed name: {extracted_name}")
+                        continue
+
+                # Handle date detection (only if it doesn't look like a name)
+                if not session.prospect_data.move_in_date and self._looks_like_date(part):
+                    # Additional check: make sure it's not just a name that happens to contain "month"
+                    if not self._looks_like_name_only(part):
+                        session.prospect_data.move_in_date = part
+                        logger.info(f"   ✅ Parsed move-in date: {part}")
+                        continue
+
+                # Handle bedroom count
+                if not session.prospect_data.beds_wanted and self._looks_like_bedroom_count(part):
                     beds_match = re.search(r'\b([1-5])\b', part)
                     if beds_match:
                         session.prospect_data.beds_wanted = int(beds_match.group(1))
                         logger.info(f"   ✅ Parsed bedrooms: {beds_match.group(1)}")
+                        continue
+
+    def _extract_name_from_text(self, text: str) -> str:
+        """Extract a person's name from text that might contain phrases like 'My name is John'."""
+        text = text.strip()
+
+        # Handle "My name is X" patterns
+        name_patterns = [
+            r'(?:my\s+name\s+is\s+|i\s+am\s+|call\s+me\s+)([a-zA-Z\s\-\'\.]+)',
+            r'^([a-zA-Z\s\-\'\.]+)$'  # Just a plain name
+        ]
+
+        for pattern in name_patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                potential_name = match.group(1).strip()
+                # Validate the extracted name
+                if self._looks_like_name(potential_name):
+                    return potential_name
+
+        return None
 
     def _looks_like_name(self, text: str) -> bool:
         """Check if text looks like a person's name."""
         return (len(text) >= 2 and
                 re.match(r"^[a-zA-Z\s\-'\.]+$", text) and
                 not '@' in text and
-                not re.search(r'\d', text))
+                not re.search(r'\d', text) and
+                len(text.split()) <= 4)  # Names shouldn't be too long
+
+    def _looks_like_name_only(self, text: str) -> bool:
+        """Check if text looks like ONLY a name (stricter validation)."""
+        # This is used to prevent date phrases like "Next month" from being treated as names
+        text_lower = text.lower().strip()
+
+        # Exclude common date-related phrases
+        date_phrases = ['next month', 'this month', 'last month', 'asap', 'soon',
+                       'winter', 'spring', 'summer', 'fall', 'january', 'february',
+                       'march', 'april', 'may', 'june', 'july', 'august',
+                       'september', 'october', 'november', 'december']
+
+        if text_lower in date_phrases:
+            return False
+
+        # Must look like a name and not contain date keywords
+        return (self._looks_like_name(text) and
+                not any(keyword in text_lower for keyword in ['month', 'year', 'asap', 'soon']))
 
     def _looks_like_email(self, text: str) -> bool:
         """Check if text looks like an email address."""
@@ -792,6 +945,191 @@ class ChatService:
 
         except Exception as e:
             logger.error(f"AI history extraction failed: {str(e)}")
+
+    def _show_selected_units(self, session: ConversationSession) -> str:
+        """Show currently selected units for multiple booking."""
+        if not session.prospect_data.selected_units:
+            return "You haven't selected any units yet. Click on apartment listings or tell me which units you'd like to see!"
+
+        unit_details = []
+        for unit_id in session.prospect_data.selected_units:
+            unit = inventory_service.get_unit_by_id(unit_id)
+            if unit:
+                unit_details.append(
+                    f"• Unit {unit.unit_id}: {unit.beds} bed/{unit.baths} bath, "
+                    f"{unit.sqft} sq ft, ${unit.rent:,}/month"
+                )
+
+        if not unit_details:
+            return "Your selected units are no longer available. Please make new selections."
+
+        unit_list = "\n".join(unit_details)
+        count = len(session.prospect_data.selected_units)
+
+        return f"""📋 Your Selected Units ({count} units):
+
+{unit_list}
+
+Ready to book all {count} units? Just say 'book all' or 'confirm booking'!
+You can also:
+• Add more units by clicking on listings
+• Remove a unit: "remove unit A101"
+• Clear all selections: "clear selections"
+"""
+
+    def _clear_selected_units(self, session: ConversationSession) -> str:
+        """Clear all selected units."""
+        count = len(session.prospect_data.selected_units)
+        session.prospect_data.selected_units.clear()
+
+        if count > 0:
+            return f"✅ Cleared {count} selected units. You can now make new selections!"
+        else:
+            return "You don't have any units selected."
+
+    def _add_selected_unit(self, session: ConversationSession, unit_id: str) -> str:
+        """Add a specific unit to selections."""
+        # Check if unit exists and is available
+        unit = inventory_service.get_unit_by_id(unit_id)
+        if not unit:
+            return f"❌ Unit {unit_id} does not exist."
+
+        if not unit.available:
+            return f"❌ Unit {unit_id} is not available for booking."
+
+        if unit_id in session.prospect_data.selected_units:
+            return f"Unit {unit_id} is already in your selections."
+
+        # Add to selections
+        session.prospect_data.selected_units.append(unit_id)
+        count = len(session.prospect_data.selected_units)
+
+        return f"✅ Added Unit {unit_id} to your selections! You now have {count} units selected. " \
+               f"Say 'show selected' to see all your selections or 'book all' when ready to book."
+
+    def _remove_selected_unit(self, session: ConversationSession, unit_id: str) -> str:
+        """Remove a specific unit from selections."""
+        if unit_id in session.prospect_data.selected_units:
+            session.prospect_data.selected_units.remove(unit_id)
+            remaining = len(session.prospect_data.selected_units)
+            return f"✅ Removed Unit {unit_id} from your selections. You have {remaining} units selected."
+        else:
+            return f"Unit {unit_id} is not in your current selections."
+
+    async def _handle_multiple_booking_intent(self, session: ConversationSession) -> str:
+        """Handle booking multiple units simultaneously."""
+        logger.info("🚀 MULTIPLE BOOKING INTENT TRIGGERED - Starting multiple booking process")
+        logger.info(f"   Session ID: {session.session_id}")
+        logger.info(f"   Prospect: {session.prospect_data.name}")
+        logger.info(f"   Email: {session.prospect_data.email}")
+        logger.info(f"   Selected Units: {session.prospect_data.selected_units}")
+
+        if not self._is_data_complete(session.prospect_data):
+            missing_fields = self._get_missing_fields(session.prospect_data)
+            logger.warning(f"❌ Multiple booking failed - missing data: {missing_fields}")
+            return f"I need a bit more information before booking. Missing: {', '.join(missing_fields)}"
+
+        if not session.prospect_data.selected_units:
+            return "You haven't selected any units to book. Please select units first by clicking on listings or telling me which units you want."
+
+        # Validate all selected units are still available
+        available_units = []
+        unavailable_units = []
+
+        for unit_id in session.prospect_data.selected_units:
+            unit = inventory_service.get_unit_by_id(unit_id)
+            if unit and unit.available:
+                available_units.append(unit)
+            else:
+                unavailable_units.append(unit_id)
+
+        if unavailable_units:
+            # Remove unavailable units from selection
+            for unit_id in unavailable_units:
+                session.prospect_data.selected_units.remove(unit_id)
+
+            if not available_units:
+                return f"I'm sorry, none of your selected units are available anymore: {', '.join(unavailable_units)}. Please make new selections."
+            else:
+                logger.warning(f"Some units became unavailable: {unavailable_units}")
+
+        # Generate tour slot
+        tour_date, tour_time = email_service.generate_tour_slot()
+
+        # Create booked units with individual confirmation numbers
+        booked_units = []
+        for unit in available_units:
+            confirmation_number = email_service.generate_confirmation_number()
+            booked_unit = BookedUnit(
+                unit_id=unit.unit_id,
+                beds=unit.beds,
+                baths=unit.baths,
+                sqft=unit.sqft,
+                rent=unit.rent,
+                confirmation_number=confirmation_number
+            )
+            booked_units.append(booked_unit)
+
+        # Create multiple booking confirmation
+        master_confirmation_number = email_service.generate_confirmation_number()
+        confirmation = MultipleBookingConfirmation(
+            prospect_name=session.prospect_data.name,
+            prospect_email=session.prospect_data.email,
+            booked_units=booked_units,
+            property_address=session.prospect_data.property_address,
+            tour_date=tour_date,
+            tour_time=tour_time,
+            master_confirmation_number=master_confirmation_number
+        )
+
+        # Send multiple booking email confirmation
+        logger.info("📧 CALLING MULTIPLE BOOKING EMAIL SERVICE")
+        logger.info(f"   Recipient: {confirmation.prospect_email}")
+        logger.info(f"   Units: {[unit.unit_id for unit in booked_units]}")
+        logger.info(f"   Master Confirmation: {master_confirmation_number}")
+
+        email_sent = await email_service.send_multiple_booking_confirmation(confirmation)
+
+        logger.info(f"📧 MULTIPLE BOOKING EMAIL SERVICE RESULT: {'SUCCESS' if email_sent else 'FAILED'}")
+
+        if email_sent:
+            session.state = ChatState.BOOKING_CONFIRMED
+            # Reserve all units
+            for unit in available_units:
+                inventory_service.reserve_unit(unit.unit_id)
+
+            # Update prospect data
+            session.prospect_data.unit_id = available_units[0].unit_id  # Legacy field
+
+            unit_list = ", ".join([unit.unit_id for unit in available_units])
+            notification_msg = (
+                f"I've sent a comprehensive confirmation email to {session.prospect_data.email}. "
+                f"Please check your inbox and spam/junk folder if you don't see it within a few minutes"
+            )
+
+            return (
+                f"🎉 Perfect! Your tours for {len(available_units)} units are confirmed for {tour_date} at {tour_time}. "
+                f"Units booked: {unit_list}. "
+                f"{notification_msg}. The email contains all the details for each unit including individual confirmation numbers. "
+                f"If you have any issues, you can also call our leasing office at {email_service.leasing_office_phone}. "
+                f"We'll see you at {session.prospect_data.property_address}!"
+            )
+        else:
+            # Still confirm the booking even if email fails
+            session.state = ChatState.BOOKING_CONFIRMED
+            for unit in available_units:
+                inventory_service.reserve_unit(unit.unit_id)
+            session.prospect_data.unit_id = available_units[0].unit_id
+
+            unit_list = ", ".join([unit.unit_id for unit in available_units])
+            return (
+                f"✅ Your tours for {len(available_units)} units are confirmed for {tour_date} at {tour_time}! "
+                f"Units: {unit_list}. "
+                f"📧 Email notifications are currently unavailable (demo mode), but your bookings are secured. "
+                f"📍 Location: {email_service.property_address} "
+                f"📞 Contact: {email_service.leasing_office_phone} "
+                f"💡 Please save these details for your records!"
+            )
 
 
 # Global instance

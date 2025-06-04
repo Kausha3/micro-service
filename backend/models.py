@@ -81,7 +81,8 @@ class ProspectData(BaseModel):
         phone (Optional[str]): Phone number (validated format)
         move_in_date (Optional[str]): Desired move-in date
         beds_wanted (Optional[int]): Number of bedrooms desired (1-5)
-        unit_id (Optional[str]): Reserved unit ID after booking
+        unit_id (Optional[str]): Reserved unit ID after booking (legacy - use selected_units)
+        selected_units (list[str]): List of selected unit IDs for multiple booking support
         property_address (Optional[str]): Property address (auto-populated)
     """
 
@@ -90,7 +91,8 @@ class ProspectData(BaseModel):
     phone: Optional[str] = None
     move_in_date: Optional[str] = None
     beds_wanted: Optional[int] = None
-    unit_id: Optional[str] = None
+    unit_id: Optional[str] = None  # Legacy field for backward compatibility
+    selected_units: list[str] = []  # New field for multiple booking support
     property_address: Optional[str] = None
 
     def __init__(self, **data):
@@ -262,3 +264,49 @@ class TourConfirmation(BaseModel):
     property_address: str
     tour_date: str
     tour_time: str
+
+
+class BookedUnit(BaseModel):
+    """
+    Individual booked unit details for multiple booking confirmations.
+
+    Attributes:
+        unit_id (str): Unit identifier
+        beds (int): Number of bedrooms
+        baths (float): Number of bathrooms
+        sqft (int): Square footage
+        rent (int): Monthly rent
+        confirmation_number (str): Individual confirmation number for this unit
+    """
+
+    unit_id: str
+    beds: int
+    baths: float
+    sqft: int
+    rent: int
+    confirmation_number: str
+
+
+class MultipleBookingConfirmation(BaseModel):
+    """
+    Multiple tour booking confirmation details.
+
+    Contains all information needed for multiple unit tour confirmation emails.
+
+    Attributes:
+        prospect_name (str): Prospect's full name
+        prospect_email (EmailStr): Validated email address
+        booked_units (list[BookedUnit]): List of all booked units with details
+        property_address (str): Property location
+        tour_date (str): Scheduled tour date
+        tour_time (str): Scheduled tour time
+        master_confirmation_number (str): Master confirmation number for the entire booking
+    """
+
+    prospect_name: str
+    prospect_email: EmailStr
+    booked_units: list[BookedUnit]
+    property_address: str
+    tour_date: str
+    tour_time: str
+    master_confirmation_number: str

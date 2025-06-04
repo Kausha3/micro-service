@@ -169,6 +169,24 @@ class InventoryService:
         logger.info(f"Retrieved {len(available)} available units")
         return available
 
+    def get_unit_by_id(self, unit_id: str) -> Optional[Unit]:
+        """
+        Get a specific unit by its ID.
+
+        Args:
+            unit_id (str): Unique unit identifier
+
+        Returns:
+            Optional[Unit]: Unit if found, None otherwise
+        """
+        for unit in self.units:
+            if unit.unit_id == unit_id:
+                logger.info(f"Found unit: {unit_id}")
+                return unit
+
+        logger.warning(f"Unit not found: {unit_id}")
+        return None
+
     def reserve_unit(self, unit_id: str) -> bool:
         """
         Reserve a unit by marking it as unavailable.
