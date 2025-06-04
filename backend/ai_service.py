@@ -8,9 +8,6 @@ Features include:
 - Intelligent database query generation
 - Dynamic response generation based on property inventory
 - Conversation flow optimization
-
-Author: Augment Agent
-Version: 1.0.0
 """
 
 import logging
