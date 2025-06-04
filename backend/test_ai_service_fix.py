@@ -7,23 +7,28 @@ import asyncio
 import os
 import sys
 
+import pytest
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
 
 
+@pytest.mark.asyncio
 async def test_ai_service():
     """Test the improved AI service"""
     try:
         # Import the AI service
         from datetime import datetime
 
-        from ai_service import ai_service
+        from ai_service import get_ai_service
         from models import AIContext, ChatState, ConversationSession, ProspectData
 
         print("🚀 Testing Improved AI Service")
         print("=" * 50)
+
+        # Get AI service instance
+        ai_service = get_ai_service()
 
         # Check if AI service is enabled
         print(f"AI Service Enabled: {'✅' if ai_service.enabled else '❌'}")
@@ -69,6 +74,7 @@ async def test_ai_service():
         return False
 
 
+@pytest.mark.asyncio
 async def test_openai_direct():
     """Test OpenAI connection directly"""
     try:

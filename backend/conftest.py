@@ -43,53 +43,90 @@ def setup_test_environment():
 @pytest.fixture(autouse=True)
 def mock_ai_service():
     """Mock the AI service to avoid using real API keys."""
-    # Mock the AI service methods directly
-    with (
-        patch("ai_service.ai_service.generate_response") as mock_generate,
-        patch("ai_service.ai_service.should_collect_information") as mock_collect,
-        patch("ai_service.ai_service.client") as mock_client,
-    ):
+    # Create a mock AI service instance
+    mock_ai_instance = MagicMock()
+    mock_ai_instance.enabled = True
+    mock_ai_instance.model = "gpt-3.5-turbo"
+    mock_ai_instance.max_retries = 3
+    mock_ai_instance.retry_delay = 2.0
 
-        # Mock generate_response to return helpful responses
-        async def mock_generate_response(session, user_message):
-            message_lower = user_message.lower()
+    # Mock generate_response to return helpful responses
+    async def mock_generate_response(session, user_message):
+        message_lower = user_message.lower()
 
-            # Return appropriate responses based on message content
-            if any(word in message_lower for word in ["hello", "hi", "hey"]):
-                return "Hello! I'm here to help you find your perfect apartment. May I have your name to get started?"
-            elif "name" in message_lower or session.state.value == "collecting_name":
-                return "Thank you! Could you please provide your email address?"
-            elif "email" in message_lower or session.state.value == "collecting_email":
-                return "Great! And what's the best phone number to reach you?"
-            elif "phone" in message_lower or session.state.value == "collecting_phone":
-                return "Perfect! When are you looking to move in?"
-            elif "move" in message_lower or "date" in message_lower:
-                return "Excellent! How many bedrooms are you looking for?"
-            elif "bedroom" in message_lower or "bed" in message_lower:
-                return "Great choice! I have several options available. Would you like to book a tour to see them?"
-            elif any(word in message_lower for word in ["book", "tour", "yes", "sure"]):
-                return "Wonderful! I've scheduled your tour. You'll receive a confirmation email shortly with all the details."
-            else:
-                return "I'm here to help you find the perfect apartment. What can I assist you with today?"
+        # Return appropriate responses based on message content
+        if any(word in message_lower for word in ["hello", "hi", "hey"]):
+            return "Hello! I'm here to help you find your perfect apartment. May I have your name to get started?"
+        elif "name" in message_lower or (
+            hasattr(session, "state") and session.state.value == "collecting_name"
+        ):
+            return "Thank you! Could you please provide your email address?"
+        elif "email" in message_lower or (
+            hasattr(session, "state") and session.state.value == "collecting_email"
+        ):
+            return "Great! And what's the best phone number to reach you?"
+        elif "phone" in message_lower or (
+            hasattr(session, "state") and session.state.value == "collecting_phone"
+        ):
+            return "Perfect! When are you looking to move in?"
+        elif "move" in message_lower or "date" in message_lower:
+            return "Excellent! How many bedrooms are you looking for?"
+        elif "bedroom" in message_lower or "bed" in message_lower:
+            return "Great choice! I have several options available. Would you like to book a tour to see them?"
+        elif any(word in message_lower for word in ["book", "tour", "yes", "sure"]):
+            return "Wonderful! I've scheduled your tour. You'll receive a confirmation email shortly with all the details."
+        else:
+            return "I'm here to help you find the perfect apartment. What can I assist you with today?"
 
-        mock_generate.side_effect = mock_generate_response
+    mock_ai_instance.generate_response = AsyncMock(side_effect=mock_generate_response)
 
-        # Mock should_collect_information to return None (no specific collection needed)
-        mock_collect.return_value = None
+    # Mock should_collect_information to return None (no specific collection needed)
+    async def mock_should_collect_information(session, user_message):
+        return None
 
-        # Mock the OpenAI client for any direct calls
-        mock_client.chat.completions.create = AsyncMock()
-        mock_response = AsyncMock()
-        mock_response.choices = [
-            MagicMock(
-                message=MagicMock(
-                    content="NAME: NONE\nEMAIL: NONE\nPHONE: NONE\nMOVE_IN: NONE\nBEDS: NONE\nUNIT: NONE"
-                )
+    mock_ai_instance.should_collect_information = AsyncMock(
+        side_effect=mock_should_collect_information
+    )
+
+    # Mock the OpenAI client for any direct calls
+    mock_client = MagicMock()
+    mock_client.chat.completions.create = AsyncMock()
+    mock_response = AsyncMock()
+    mock_response.choices = [
+        MagicMock(
+            message=MagicMock(
+                content="NAME: NONE\nEMAIL: NONE\nPHONE: NONE\nMOVE_IN: NONE\nBEDS: NONE\nUNIT: NONE"
             )
-        ]
-        mock_client.chat.completions.create.return_value = mock_response
+        )
+    ]
+    mock_client.chat.completions.create.return_value = mock_response
+    mock_ai_instance.client = mock_client
 
-        yield mock_generate
+    # Mock both the global ai_service variable and the get_ai_service function
+    # Also patch any direct imports of ai_service in test modules
+    patches = [
+        patch("ai_service.ai_service", mock_ai_instance),
+        patch("ai_service.get_ai_service", return_value=mock_ai_instance),
+        patch("chat_service.get_ai_service", return_value=mock_ai_instance),
+    ]
+
+    # Try to patch test modules that might import ai_service directly
+    try:
+        patches.append(patch("test_ai_integration.ai_service", mock_ai_instance))
+    except (ImportError, AttributeError):
+        pass
+
+    try:
+        patches.append(patch("test_ai_service_fix.ai_service", mock_ai_instance))
+    except (ImportError, AttributeError):
+        pass
+
+    with patch.multiple(
+        "ai_service",
+        ai_service=mock_ai_instance,
+        get_ai_service=lambda: mock_ai_instance,
+    ):
+        yield mock_ai_instance
 
 
 @pytest.fixture(autouse=True)

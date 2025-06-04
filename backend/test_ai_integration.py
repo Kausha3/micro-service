@@ -16,7 +16,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 import uuid
 from datetime import datetime
 
-from ai_service import ai_service
+from ai_service import get_ai_service
 from models import AIContext, ChatState, ConversationSession, ProspectData
 
 
@@ -26,6 +26,9 @@ async def test_ai_integration():
 
     print("🤖 Testing AI Integration for Lead-to-Lease Chat Concierge")
     print("=" * 60)
+
+    # Get AI service instance
+    ai_service = get_ai_service()
 
     # AI service should be enabled in test environment
     assert ai_service.enabled, "AI service should be enabled in test environment"
@@ -101,6 +104,9 @@ async def test_inventory_context():
 
     print("\n🏠 Testing Inventory Context Integration")
     print("-" * 40)
+
+    # Get AI service instance
+    ai_service = get_ai_service()
 
     # AI service should be enabled in test environment
     assert ai_service.enabled, "AI service should be enabled in test environment"
