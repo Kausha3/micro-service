@@ -10,9 +10,6 @@ This module contains all tests for the chat microservice including:
 - Database persistence testing
 
 Run with: python -m pytest test_comprehensive.py -v
-
-Author: Augment Agent
-Version: 1.0.0
 """
 
 from datetime import datetime
