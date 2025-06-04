@@ -103,7 +103,7 @@ class AIService:
     def _create_system_prompt(self, available_units: List[Unit], prospect_data) -> str:
         """Create comprehensive system prompt with property and inventory context."""
         
-        # Format available units for context
+        # Format available units for context with enhanced bullet point structure
         units_context = ""
         if available_units:
             units_by_beds = {}
@@ -112,14 +112,16 @@ class AIService:
                 if beds not in units_by_beds:
                     units_by_beds[beds] = []
                 units_by_beds[beds].append(unit)
-            
+
             units_context = "Available Units:\n"
             # Sort by bedroom count, handling both int and string types
             sorted_beds = sorted(units_by_beds.items(), key=lambda x: (0 if x[0] == "Studio" else x[0]))
             for beds, units in sorted_beds:
                 units_context += f"\n{beds} bedroom{'s' if beds != 1 and beds != 'Studio' else ''}:\n"
                 for unit in units:
-                    units_context += f"- Unit {unit.unit_id}: {unit.sqft} sq ft, ${unit.rent}/month, {unit.baths} bath{'s' if unit.baths != 1 else ''}\n"
+                    # Enhanced bullet point format for better readability
+                    bath_text = f"{unit.baths} bath{'s' if unit.baths != 1 else ''}"
+                    units_context += f"• Unit {unit.unit_id} | {beds} bed/{bath_text} | {unit.sqft} sq ft | ${unit.rent:,}/month\n"
         
         # Current prospect data context
         prospect_context = ""
@@ -158,6 +160,16 @@ IMPORTANT GUIDELINES:
 - If inventory doesn't match their needs, be honest but offer alternatives
 - Keep responses concise but informative (under 200 words typically)
 - Use a warm, professional tone that makes people feel welcome
+
+APARTMENT LISTING FORMAT:
+When showing apartment options, use this clear bullet point format for easy scanning:
+• Unit [ID] | [X] bed/[Y] bath | [sqft] sq ft | $[rent]/month
+
+Example:
+• Unit A101 | 1 bed/1 bath | 650 sq ft | $1,800/month
+• Unit B301 | 2 bed/2 bath | 950 sq ft | $2,400/month
+
+This format helps users quickly compare options and find their perfect home!
 
 Remember: You're here to help people find their perfect home!
 

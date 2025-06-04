@@ -128,6 +128,24 @@ class ChatService:
             # CRITICAL FIX: Try to parse multiple fields from user message before AI processing
             self._parse_multiple_fields_from_message(session, message)
 
+            # ENHANCED: Check for direct unit booking requests (e.g., "I want to book Unit B301")
+            unit_booking_match = re.search(r'(?:book|want|select|choose).*?unit\s+([A-Z]\d{2,3})', message.lower())
+            if unit_booking_match:
+                unit_id = unit_booking_match.group(1).upper()
+                logger.info(f"🎯 Direct unit booking request detected: {unit_id}")
+
+                # Get unit details to determine bedroom count
+                unit = inventory_service.get_unit_by_id(unit_id)
+                if unit and unit.available:
+                    session.prospect_data.unit_id = unit_id
+                    session.prospect_data.beds_wanted = unit.beds
+                    logger.info(f"   ✅ Set unit_id to {unit_id} and beds_wanted to {unit.beds}")
+
+                    # If this is a direct booking request, set booking intent
+                    if any(keyword in message.lower() for keyword in ["book", "want to book"]):
+                        session.ai_context.extracted_intents.append("booking_intent")
+                        logger.info("   ✅ Added booking_intent to extracted_intents")
+
             # ADDITIONAL FIX: If user selected a studio unit, set beds_wanted to 0
             if not session.prospect_data.beds_wanted and "studio" in message.lower():
                 session.prospect_data.beds_wanted = 0  # Studio = 0 bedrooms

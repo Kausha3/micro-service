@@ -59,9 +59,9 @@ def demo_conversation_scenarios():
                 ("User", "Hi, I'm looking for an apartment"),
                 ("AI", "Hello! I'd be happy to help you find the perfect apartment at Luxury Apartments at Main Street. What type of place are you looking for?"),
                 ("User", "What do you have available?"),
-                ("AI", f"We have several great options available! Here's what we currently have:\n\n• Studio apartments: Starting at $1500/month (450-500 sq ft)\n• 1-bedroom units: $1800-2000/month (650-750 sq ft)\n• 2-bedroom apartments: $2400-2700/month (950-1100 sq ft)\n• 3-bedroom units: $3200-3500/month (1200-1350 sq ft)\n• 4-bedroom apartments: $4200-4500/month (1600-1750 sq ft)\n\nWhat size apartment interests you most?"),
+                ("AI", f"We have several great options available! Here's what we currently have:\n\n• Studio Units | 0 bed/1 bath | 450-500 sq ft | $1,500-1,600/month\n• 1-Bedroom Units | 1 bed/1-1.5 bath | 650-750 sq ft | $1,800-2,000/month\n• 2-Bedroom Units | 2 bed/2-2.5 bath | 950-1,100 sq ft | $2,400-2,700/month\n• 3-Bedroom Units | 3 bed/2.5-3 bath | 1,200-1,350 sq ft | $3,200-3,500/month\n• 4-Bedroom Units | 4 bed/3 bath | 1,600-1,750 sq ft | $4,200-4,500/month\n\nWhat size apartment interests you most?"),
                 ("User", "I need something with 2 bedrooms"),
-                ("AI", f"Perfect! I have several excellent 2-bedroom options for you:\n\n• Unit B301: 2 bed/2 bath, 950 sq ft, $2400/month\n• Unit B402: 2 bed/2 bath, 1000 sq ft, $2500/month\n• Unit B503: 2 bed/2.5 bath, 1100 sq ft, $2700/month\n• Unit B604: 2 bed/2 bath, 975 sq ft, $2450/month\n\nAll of these units are currently available. Would you like more details about any of these, or would you like to schedule a tour?")
+                ("AI", f"Perfect! I have several excellent 2-bedroom options for you:\n\n• Unit B301 | 2 bed/2 bath | 950 sq ft | $2,400/month\n• Unit B402 | 2 bed/2 bath | 1,000 sq ft | $2,500/month\n• Unit B503 | 2 bed/2.5 bath | 1,100 sq ft | $2,700/month\n• Unit B604 | 2 bed/2 bath | 975 sq ft | $2,450/month\n\nAll of these units are currently available. Would you like more details about any of these, or would you like to schedule a tour?")
             ]
         },
         {
@@ -77,7 +77,7 @@ def demo_conversation_scenarios():
             "title": "Specific Requirements",
             "conversation": [
                 ("User", "I need a 3-bedroom apartment with at least 1200 square feet"),
-                ("AI", "Excellent! I have perfect options for you. Our 3-bedroom units all meet your space requirements:\n\n• Unit C501: 3 bed/2.5 bath, 1200 sq ft, $3200/month\n• Unit C703: 3 bed/3 bath, 1350 sq ft, $3500/month  \n• Unit C804: 3 bed/2.5 bath, 1225 sq ft, $3250/month\n\nAll of these exceed your 1200 sq ft requirement. Unit C703 is our most spacious option with a full 3rd bathroom. When are you looking to move in?"),
+                ("AI", "Excellent! I have perfect options for you. Our 3-bedroom units all meet your space requirements:\n\n• Unit C501 | 3 bed/2.5 bath | 1,200 sq ft | $3,200/month\n• Unit C703 | 3 bed/3 bath | 1,350 sq ft | $3,500/month\n• Unit C804 | 3 bed/2.5 bath | 1,225 sq ft | $3,250/month\n\nAll of these exceed your 1,200 sq ft requirement. Unit C703 is our most spacious option with a full 3rd bathroom. When are you looking to move in?"),
                 ("User", "I need to move in next month"),
                 ("AI", "Perfect timing! All of our 3-bedroom units are available for immediate move-in. Since you need to move next month, I'd recommend scheduling a tour soon so we can get your application processed. Would you like to book a tour to see these units? I can schedule something as early as this week.")
             ]
@@ -103,7 +103,7 @@ def demo_conversation_scenarios():
             "title": "Complex Query Handling",
             "conversation": [
                 ("User", "Do you have any units with parking and a balcony under $2500?"),
-                ("AI", "Great question! While I don't have specific details about parking and balconies in my current system, I can tell you about our units under $2500:\n\n• Studio units: $1500-1600/month\n• 1-bedroom units: $1800-2000/month  \n• 2-bedroom Unit B301: $2400/month\n• 2-bedroom Unit B604: $2450/month\n\nFor specific amenity details like parking availability and balconies, I'd recommend scheduling a tour where our leasing team can show you the exact features of each unit. Would you like to book a tour to see these options in person?"),
+                ("AI", "Great question! While I don't have specific details about parking and balconies in my current system, I can tell you about our units under $2,500:\n\n• Studio Units | 0 bed/1 bath | 450-500 sq ft | $1,500-1,600/month\n• 1-Bedroom Units | 1 bed/1-1.5 bath | 650-750 sq ft | $1,800-2,000/month\n• Unit B301 | 2 bed/2 bath | 950 sq ft | $2,400/month\n• Unit B604 | 2 bed/2 bath | 975 sq ft | $2,450/month\n\nFor specific amenity details like parking availability and balconies, I'd recommend scheduling a tour where our leasing team can show you the exact features of each unit. Would you like to book a tour to see these options in person?"),
                 ("User", "Yes, let's schedule that"),
                 ("AI", "Perfect! I'll help you schedule a tour. To get started, what's your name?")
             ]
