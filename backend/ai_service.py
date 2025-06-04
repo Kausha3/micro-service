@@ -35,10 +35,21 @@ class AIService:
     def __init__(self):
         """Initialize AI service with OpenAI client and configuration."""
         # Configure timeout and retry settings for production deployment
-        timeout_seconds = float(
-            os.getenv("OPENAI_TIMEOUT", "60.0")
-        )  # 60 seconds for Render
-        max_retries = int(os.getenv("OPENAI_MAX_RETRIES", "3"))
+        # Render has specific networking requirements, so we use more conservative settings
+        is_production = os.getenv("ENVIRONMENT") == "production"
+
+        if is_production:
+            # More conservative settings for Render deployment
+            timeout_seconds = float(
+                os.getenv("OPENAI_TIMEOUT", "30.0")
+            )  # Shorter timeout for Render
+            max_retries = int(
+                os.getenv("OPENAI_MAX_RETRIES", "2")
+            )  # Fewer retries to avoid cascading failures
+        else:
+            # Development settings
+            timeout_seconds = float(os.getenv("OPENAI_TIMEOUT", "60.0"))
+            max_retries = int(os.getenv("OPENAI_MAX_RETRIES", "3"))
 
         self.client = AsyncOpenAI(
             api_key=os.getenv("OPENAI_API_KEY"),
@@ -73,7 +84,9 @@ class AIService:
                     f"AI service initialized in test mode with model: {self.model}"
                 )
             else:
-                logger.info(f"AI service initialized with model: {self.model}")
+                logger.info(
+                    f"AI service initialized with model: {self.model} (timeout: {timeout_seconds}s, retries: {max_retries})"
+                )
 
     async def generate_response(
         self, session: ConversationSession, user_message: str
@@ -91,9 +104,12 @@ class AIService:
         if not self.enabled:
             return "I'm sorry, AI features are currently unavailable. Please ensure the OpenAI API key is configured."
 
-        # Retry logic for network resilience
-        max_attempts = 3
-        base_delay = 1.0
+        # Retry logic for network resilience - optimized for Render deployment
+        is_production = os.getenv("ENVIRONMENT") == "production"
+        max_attempts = (
+            2 if is_production else 3
+        )  # Fewer attempts in production to avoid cascading failures
+        base_delay = 0.5 if is_production else 1.0  # Shorter delays in production
 
         for attempt in range(max_attempts):
             try:
@@ -109,6 +125,9 @@ class AIService:
                 )
 
                 # Generate response using OpenAI with retry logic
+                # Use shorter max_tokens in production to reduce response time
+                max_tokens = 300 if is_production else 500
+
                 response = await self.client.chat.completions.create(
                     model=self.model,
                     messages=[
@@ -117,7 +136,7 @@ class AIService:
                         {"role": "user", "content": user_message},
                     ],
                     temperature=0.7,
-                    max_tokens=500,
+                    max_tokens=max_tokens,
                 )
 
                 ai_response = response.choices[0].message.content.strip()
@@ -128,9 +147,17 @@ class AIService:
                 return ai_response
 
             except (APIConnectionError, APITimeoutError) as e:
+                error_msg = str(e)
                 logger.warning(
-                    f"AI connection error on attempt {attempt + 1}/{max_attempts}: {str(e)}"
+                    f"AI connection error on attempt {attempt + 1}/{max_attempts}: {error_msg}"
                 )
+
+                # Log additional context for debugging
+                if "Connection error" in error_msg:
+                    logger.warning(
+                        "This may be a network connectivity issue with OpenAI's servers"
+                    )
+
                 if attempt < max_attempts - 1:
                     delay = base_delay * (2**attempt)  # Exponential backoff
                     logger.info(f"Retrying in {delay} seconds...")
@@ -331,7 +358,7 @@ IMPORTANT EMAIL GUIDANCE:
         return preferences
 
     async def should_collect_information(
-        self, session: ConversationSession, user_message: str
+        self, session: ConversationSession, user_message: str  # noqa: ARG002
     ) -> Optional[str]:
         """
         Determine if we should collect specific information based on conversation context.
