@@ -182,7 +182,7 @@ FRONTEND_URL=http://localhost:3000
 1. **Get OpenAI API Key**: Visit [OpenAI's website](https://platform.openai.com/api-keys)
 2. **Add to Environment**: Set `OPENAI_API_KEY` in your `.env` file
 3. **Choose Model**: Select between `gpt-3.5-turbo` (faster, cheaper) or `gpt-4` (more sophisticated)
-4. **Test Integration**: Run `python backend/test_ai_integration.py`
+4. **Test Integration**: Run `python backend/test_openai_connection.py` to verify your setup
 
 **Note**: The application gracefully falls back to helpful responses if AI is unavailable.
 
@@ -256,6 +256,8 @@ AI_CONTEXT_LIMIT=10            # Conversation history limit
 ### Render Deployment
 
 The application is ready for deployment on Render. Follow these steps:
+
+**⚠️ Important**: Ensure all environment variables are properly configured. See `RENDER_DEPLOYMENT_TROUBLESHOOTING.md` for common issues and solutions.
 
 1. **Push to GitHub**: Commit and push your code to a GitHub repository
 2. **Connect to Render**:

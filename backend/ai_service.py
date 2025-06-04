@@ -10,11 +10,13 @@ Features include:
 - Conversation flow optimization
 """
 
+import asyncio
 import logging
 import os
 from typing import Dict, List, Optional, Union
 
 from openai import AsyncOpenAI
+from openai._exceptions import APIConnectionError, APITimeoutError, RateLimitError
 
 from inventory_service import inventory_service
 from models import ConversationSession, Unit
@@ -32,7 +34,17 @@ class AIService:
 
     def __init__(self):
         """Initialize AI service with OpenAI client and configuration."""
-        self.client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        # Configure timeout and retry settings for production deployment
+        timeout_seconds = float(
+            os.getenv("OPENAI_TIMEOUT", "60.0")
+        )  # 60 seconds for Render
+        max_retries = int(os.getenv("OPENAI_MAX_RETRIES", "3"))
+
+        self.client = AsyncOpenAI(
+            api_key=os.getenv("OPENAI_API_KEY"),
+            timeout=timeout_seconds,
+            max_retries=max_retries,
+        )
         self.model = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
         self.property_name = os.getenv(
             "PROPERTY_NAME", "Luxury Apartments at Main Street"
@@ -79,40 +91,64 @@ class AIService:
         if not self.enabled:
             return "I'm sorry, AI features are currently unavailable. Please ensure the OpenAI API key is configured."
 
-        try:
-            # Get available inventory for context
-            available_units = inventory_service.get_all_available_units()
+        # Retry logic for network resilience
+        max_attempts = 3
+        base_delay = 1.0
 
-            # Build conversation context
-            conversation_history = self._build_conversation_history(session)
+        for attempt in range(max_attempts):
+            try:
+                # Get available inventory for context
+                available_units = inventory_service.get_all_available_units()
 
-            # Create system prompt with property and inventory context
-            system_prompt = self._create_system_prompt(
-                available_units, session.prospect_data
-            )
+                # Build conversation context
+                conversation_history = self._build_conversation_history(session)
 
-            # Generate response using OpenAI
-            response = await self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    *conversation_history,
-                    {"role": "user", "content": user_message},
-                ],
-                temperature=0.7,
-                max_tokens=500,
-            )
+                # Create system prompt with property and inventory context
+                system_prompt = self._create_system_prompt(
+                    available_units, session.prospect_data
+                )
 
-            ai_response = response.choices[0].message.content.strip()
+                # Generate response using OpenAI with retry logic
+                response = await self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        *conversation_history,
+                        {"role": "user", "content": user_message},
+                    ],
+                    temperature=0.7,
+                    max_tokens=500,
+                )
 
-            # Update AI context
-            await self._update_ai_context(session, user_message, ai_response)
+                ai_response = response.choices[0].message.content.strip()
 
-            return ai_response
+                # Update AI context
+                await self._update_ai_context(session, user_message, ai_response)
 
-        except Exception as e:
-            logger.error(f"AI response generation failed: {str(e)}")
-            return "I apologize, but I'm having trouble processing your request right now. Could you please try again?"
+                return ai_response
+
+            except (APIConnectionError, APITimeoutError) as e:
+                logger.warning(
+                    f"AI connection error on attempt {attempt + 1}/{max_attempts}: {str(e)}"
+                )
+                if attempt < max_attempts - 1:
+                    delay = base_delay * (2**attempt)  # Exponential backoff
+                    logger.info(f"Retrying in {delay} seconds...")
+                    await asyncio.sleep(delay)
+                else:
+                    logger.error("All AI connection attempts failed")
+                    return "I'm experiencing connectivity issues. Please try again in a moment."
+
+            except RateLimitError as e:
+                logger.warning(f"AI rate limit exceeded: {str(e)}")
+                return "I'm currently handling many requests. Please try again in a few seconds."
+
+            except Exception as e:
+                logger.error(f"AI response generation failed: {str(e)}")
+                return "I apologize, but I'm having trouble processing your request right now. Could you please try again?"
+
+        # This should never be reached due to the loop logic, but mypy requires it
+        return "I apologize, but I'm having trouble processing your request right now. Could you please try again?"
 
     def _create_system_prompt(self, available_units: List[Unit], prospect_data) -> str:
         """Create comprehensive system prompt with property and inventory context."""
