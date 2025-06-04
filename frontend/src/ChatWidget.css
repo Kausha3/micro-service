@@ -132,6 +132,13 @@
   animation-delay: -0.16s;
 }
 
+.typing-text {
+  font-size: 12px;
+  color: #666;
+  font-style: italic;
+  margin-top: 4px;
+}
+
 .error-banner {
   background: #fee;
   color: #c33;

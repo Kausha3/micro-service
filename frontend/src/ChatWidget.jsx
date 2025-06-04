@@ -188,8 +188,9 @@ function ChatWidget() {
         timestamp: new Date().toISOString()
       }
 
+      // Add assistant response to existing messages (user message already added)
+      setMessages(prev => [...prev, assistantMessage])
       const updatedMessages = [...messages, userMessage, assistantMessage]
-      setMessages(updatedMessages)
 
       // Update session ID if provided
       const currentSessionId = response.data.session_id || sessionId
@@ -313,6 +314,7 @@ function ChatWidget() {
                 <span></span>
                 <span></span>
               </div>
+              <div className="message-text typing-text">Assistant is typing...</div>
             </div>
           </div>
         )}

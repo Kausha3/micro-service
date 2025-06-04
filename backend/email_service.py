@@ -3,8 +3,10 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from models import TourConfirmation
 import os
+import uuid
 from datetime import datetime, timedelta
 import logging
+import asyncio
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -31,23 +33,88 @@ class EmailService:
         self.property_name = os.getenv(
             "PROPERTY_NAME", "Luxury Apartments at Main Street"
         )
+        self.email_timeout = int(os.getenv("EMAIL_TIMEOUT", "30"))  # Default 30 seconds
+
+        # Log initialization details for debugging
+        logger.info("🔧 EmailService initialized with configuration:")
+        logger.info(f"   SMTP Email: {self.smtp_email}")
+        logger.info(f"   SMTP Server: {self.smtp_server}:{self.smtp_port}")
+        logger.info(f"   Property: {self.property_name}")
+        logger.info(f"   Timeout: {self.email_timeout}s")
+
+        # Validate configuration on startup
+        config_valid = self._validate_email_config()
+        logger.info(f"   Configuration Valid: {'✅' if config_valid else '❌'}")
 
     async def send_tour_confirmation(self, confirmation: TourConfirmation) -> bool:
         """
-        Send a tour confirmation email to the prospect.
+        Send a tour confirmation email to the prospect with retry logic.
         Returns True if successful, False otherwise.
         """
-        try:
-            # Validate email configuration
-            if not self._validate_email_config():
-                logger.error("Email configuration is invalid")
-                return False
+        logger.info("🚀 EMAIL SERVICE CALLED - Starting tour confirmation email process")
+        logger.info(f"   📧 Recipient: {confirmation.prospect_email}")
+        logger.info(f"   🏠 Unit: {confirmation.unit_id}")
+        logger.info(f"   👤 Prospect: {confirmation.prospect_name}")
 
-            # Create email message
+        # Validate email configuration
+        if not self._validate_email_config():
+            logger.error("❌ Email configuration is invalid - aborting email send")
+            return False
+
+        # Validate recipient email address
+        if not confirmation.prospect_email or "@" not in confirmation.prospect_email:
+            logger.error(f"❌ Invalid recipient email address: {confirmation.prospect_email}")
+            return False
+
+        logger.info("✅ Email configuration and recipient validation passed")
+
+        # Retry logic for real-time delivery
+        max_retries = 3
+        retry_delay = 2  # Start with 2 seconds
+
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"📧 Email sending attempt {attempt + 1}/{max_retries}")
+                success = await self._send_email_attempt(confirmation)
+                if success:
+                    logger.info(f"✅ Email sent successfully on attempt {attempt + 1}")
+                    return True
+
+            except Exception as e:
+                logger.warning(f"⚠️ Email attempt {attempt + 1} failed: {str(e)}")
+                if attempt < max_retries - 1:  # Don't sleep on last attempt
+                    logger.info(f"🔄 Retrying in {retry_delay} seconds...")
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 2  # Exponential backoff
+
+        logger.error(f"❌ All {max_retries} email attempts failed")
+        return False
+
+    async def _send_email_attempt(self, confirmation: TourConfirmation) -> bool:
+        """
+        Single attempt to send email with proper error handling.
+        """
+        try:
+            # Log the confirmation details
+            logger.info(f"🎯 Processing tour confirmation:")
+            logger.info(f"   Prospect: {confirmation.prospect_name}")
+            logger.info(f"   Email: {confirmation.prospect_email}")
+            logger.info(f"   Unit: {confirmation.unit_id}")
+            logger.info(f"   Date: {confirmation.tour_date}")
+            logger.info(f"   Time: {confirmation.tour_time}")
+
+            # Create email message with proper headers for better deliverability
             message = MIMEMultipart("alternative")
             message["Subject"] = f"Tour Confirmation - {confirmation.unit_id}"
-            message["From"] = self.smtp_email
+            message["From"] = f"{self.property_name} <{self.smtp_email}>"
             message["To"] = confirmation.prospect_email
+            message["Reply-To"] = self.smtp_email
+            message["Message-ID"] = f"<{uuid.uuid4()}@{self.smtp_server}>"
+            message["Date"] = datetime.now().strftime("%a, %d %b %Y %H:%M:%S %z")
+
+            # Add headers to improve deliverability
+            message["X-Mailer"] = "Lead-to-Lease Chat Concierge v1.0"
+            message["X-Priority"] = "3"  # Normal priority
 
             # Create email content
             text_content = self._create_text_content(confirmation)
@@ -67,19 +134,72 @@ class EmailService:
             context.check_hostname = False
             context.verify_mode = ssl.CERT_NONE
 
-            await aiosmtplib.send(
-                message,
+            # Log email details before sending
+            logger.info(f"📧 Attempting to send email:")
+            logger.info(f"   From: {self.smtp_email}")
+            logger.info(f"   To: {confirmation.prospect_email}")
+            logger.info(f"   Subject: Tour Confirmation - {confirmation.unit_id}")
+            logger.info(f"   SMTP Server: {self.smtp_server}:{self.smtp_port}")
+
+            # Send email with explicit connection management for reliability
+            smtp_client = aiosmtplib.SMTP(
                 hostname=self.smtp_server,
                 port=self.smtp_port,
+                timeout=self.email_timeout,  # Configurable timeout for real-time delivery
                 start_tls=True,
-                username=self.smtp_email,
-                password=self.smtp_password,
                 tls_context=context,
             )
 
-            logger.info(
-                f"Tour confirmation email sent to {confirmation.prospect_email}"
-            )
+            try:
+                # Establish connection
+                logger.info("🔌 Connecting to SMTP server...")
+                await smtp_client.connect()
+                logger.info("✅ SMTP connection established")
+
+                # Authenticate
+                logger.info("🔐 Authenticating with SMTP server...")
+                await smtp_client.login(self.smtp_email, self.smtp_password)
+                logger.info("✅ SMTP authentication successful")
+
+                # Send the message
+                logger.info("📤 Sending email message...")
+                send_result = await smtp_client.send_message(message)
+                logger.info("✅ Email message sent successfully")
+
+                # Log send result for debugging
+                if send_result:
+                    logger.info(f"📬 SMTP send result: {send_result}")
+                else:
+                    logger.info("📬 SMTP send completed (no explicit result)")
+
+            finally:
+                # Always close the connection
+                try:
+                    await smtp_client.quit()
+                    logger.info("🔌 SMTP connection closed")
+                except Exception as close_error:
+                    logger.warning(f"⚠️ Error closing SMTP connection: {close_error}")
+
+            # Log successful delivery with timestamp
+            delivery_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            logger.info(f"🎉 EMAIL DELIVERY SUCCESS at {delivery_time}")
+            logger.info(f"   ✅ Recipient: {confirmation.prospect_email}")
+            logger.info(f"   ✅ Unit: {confirmation.unit_id}")
+            logger.info(f"   ✅ Subject: Tour Confirmation - {confirmation.unit_id}")
+            logger.info(f"   ✅ From: {self.smtp_email}")
+            logger.info(f"   ✅ SMTP Server: {self.smtp_server}:{self.smtp_port}")
+
+            # Additional verification logging
+            logger.info(f"📬 Email content summary:")
+            logger.info(f"   Text length: {len(text_content)} characters")
+            logger.info(f"   HTML length: {len(html_content)} characters")
+            logger.info(f"   Message size: {len(str(message))} bytes")
+
+            # Important delivery notes
+            logger.info(f"📧 DELIVERY STATUS: Email successfully submitted to SMTP server")
+            logger.info(f"📧 NEXT STEPS: Email should arrive within 1-5 minutes")
+            logger.info(f"📧 USER GUIDANCE: Check inbox and spam/junk folder")
+
             return True
 
         except aiosmtplib.SMTPAuthenticationError as e:
@@ -143,9 +263,9 @@ Date: {confirmation.tour_date}
 Time: {confirmation.tour_time}
 
 WHAT TO BRING:
-• Valid government-issued photo ID
-• Proof of income (recent pay stubs or employment letter)
-• Application fee ($50 - if you decide to apply)
+- Valid government-issued photo ID
+- Proof of income (recent pay stubs or employment letter)
+- Application fee ($50 - if you decide to apply)
 
 CONTACT INFORMATION:
 Leasing Office: {self.leasing_office_phone}
@@ -158,6 +278,15 @@ We look forward to showing you your potential new home!
 Best regards,
 The Leasing Team
 {self.property_name}
+
+---
+This email was sent to {confirmation.prospect_email} regarding your tour request.
+If you did not request this tour, please contact us at {self.leasing_office_phone}.
+
+{self.property_name}
+{confirmation.property_address}
+Phone: {self.leasing_office_phone}
+Email: {self.smtp_email}
         """.strip()
 
     def _create_html_content(self, confirmation: TourConfirmation) -> str:
@@ -217,6 +346,15 @@ The Leasing Team
         </div>
         <div class="footer">
             <p>Best regards,<br>The Leasing Team<br>{self.property_name}</p>
+            <hr style="margin: 20px 0; border: none; border-top: 1px solid #ddd;">
+            <p style="font-size: 12px; color: #666;">
+                This email was sent to {confirmation.prospect_email} regarding your tour request.<br>
+                If you did not request this tour, please contact us at {self.leasing_office_phone}.<br><br>
+                {self.property_name}<br>
+                {confirmation.property_address}<br>
+                Phone: {self.leasing_office_phone}<br>
+                Email: {self.smtp_email}
+            </p>
         </div>
     </div>
 </body>

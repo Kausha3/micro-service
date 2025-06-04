@@ -10,9 +10,11 @@ from models import (
     ConversationSession,
     TourConfirmation,
     ConversationMessage,
+    AIContext,
 )
 from inventory_service import inventory_service
 from email_service import email_service
+from ai_service import ai_service
 
 # SMS functionality removed - email-only notifications
 from session_db_service import session_db_service
@@ -24,53 +26,12 @@ logger = logging.getLogger(__name__)
 
 class ChatService:
     """
-    Core chat service that manages conversation flow and state.
-    Implements structured reasoning for data collection and booking flow.
-    Now uses SQLite database for session persistence.
+    AI-powered chat service that manages conversation flow and state.
+
+    Implements intelligent conversation logic using OpenAI GPT models
+    for natural language understanding and contextual responses.
+    Maintains compatibility with existing database and booking systems.
     """
-
-    # Enhanced keyword arrays for better intent detection
-    APARTMENT_KEYWORDS = [
-        "apartment",
-        "unit",
-        "rent",
-        "looking for",
-        "show me",
-        "bedroom",
-        "bed",
-        "searching",
-        "place",
-        "home",
-        "lease",
-        "find",
-        "available",
-        "2br",
-        "3br",
-        "1br",
-        "studio",
-        "sqft",
-        "square feet",
-    ]
-
-    BOOKING_KEYWORDS = [
-        "book",
-        "tour",
-        "visit",
-        "appointment",
-        "schedule",
-        "reserve",
-        "confirm",
-        "interested in booking",
-        "want to book",
-        "book a tour",
-        "schedule a tour",
-        "want it",
-        "take it",
-        "sign up",
-        "yes",
-        "sure",
-        "okay",
-    ]
 
     def __init__(self):
         # Database-backed session storage
@@ -78,8 +39,8 @@ class ChatService:
 
     async def process_message(self, message: ChatMessage) -> ChatResponse:
         """
-        Process incoming chat message and return appropriate response.
-        Main entry point for chat logic.
+        Process incoming chat message using AI-powered conversation logic.
+        Main entry point for AI-enhanced chat processing.
         """
         # Get or create session
         session = self._get_or_create_session(message.session_id)
@@ -87,8 +48,8 @@ class ChatService:
         # Add user message to conversation
         self._add_message(session, "user", message.message)
 
-        # Process message based on current state
-        response_text = await self._process_by_state(session, message.message)
+        # Use AI to generate response
+        response_text = await self._process_with_ai(session, message.message)
 
         # Add assistant response to conversation
         self._add_message(session, "bot", response_text)
@@ -116,83 +77,163 @@ class ChatService:
             if existing_session:
                 return existing_session
 
-        # Create new session
+        # Create new session with AI context
         new_session_id = session_id or str(uuid.uuid4())
         session = ConversationSession(
             session_id=new_session_id,
             state=ChatState.GREETING,
             prospect_data=ProspectData(),
             messages=[],
+            ai_context=AIContext(),
             created_at=datetime.now(),
             updated_at=datetime.now(),
         )
         return session
 
-    def _add_message(self, session: ConversationSession, sender: str, text: str):
-        """
-        Add message to session history.
 
-        Creates a timestamped conversation message and appends it to the session's
-        message history for tracking the complete conversation flow.
-        """
-        message = ConversationMessage(
-            sender=sender, text=text, timestamp=datetime.now()
-        )
-        session.messages.append(message)
 
-    async def _process_by_state(
+    async def _process_with_ai(
         self, session: ConversationSession, message: str
     ) -> str:
-        """Process message based on current conversation state."""
-        message_lower = message.lower().strip()
+        """
+        Process message using AI-powered conversation logic.
 
-        # Check for booking intent at any stage (highest priority)
-        # But skip if already in BOOKING_CONFIRMED state to avoid duplicates
-        if session.state != ChatState.BOOKING_CONFIRMED and self._is_booking_intent(
-            message_lower
-        ):
-            return await self._handle_smart_booking_intent(session, message)
+        This method replaces the rule-based state machine with intelligent
+        AI-driven conversation flow that can handle natural language queries.
+        """
+        try:
+            # Check if booking is already confirmed
+            if session.state == ChatState.BOOKING_CONFIRMED:
+                return await self._handle_post_booking_ai(session, message)
 
-        # Special handling for GREETING state to avoid redundant prompts
-        if session.state == ChatState.GREETING:
-            # If they express apartment search intent in greeting, handle it there
-            # to avoid duplicate "What's your name?" prompts
-            if self._is_apartment_search_intent(message_lower):
-                return self._handle_greeting(session, message)
-        else:
-            # Check for apartment search intent at any stage (lower priority)
-            # If user expresses apartment search intent, acknowledge and guide
-            if self._is_apartment_search_intent(message_lower):
-                return await self._handle_apartment_search_intent(session, message)
+            # Check if we need to collect specific information for booking
+            missing_field = await ai_service.should_collect_information(session, message)
+            if missing_field:
+                return await self._handle_information_collection(session, message, missing_field)
 
-        # State-specific processing
-        if session.state == ChatState.GREETING:
-            return self._handle_greeting(session, message)
+            # Check if user wants to book and we have all required information
+            if self._has_booking_intent(message):
+                data_complete = self._is_data_complete(session.prospect_data)
+                logger.info(f"🎯 BOOKING INTENT DETECTED - Data complete: {'✅' if data_complete else '❌'}")
 
-        elif session.state == ChatState.COLLECTING_NAME:
+                if data_complete:
+                    logger.info("🚀 All data complete - triggering booking flow")
+                    return await self._handle_booking_intent(session)
+                else:
+                    missing_fields = self._get_missing_fields(session.prospect_data)
+                    logger.warning(f"❌ Cannot book - missing fields: {missing_fields}")
+                    logger.info(f"   Current data: name='{session.prospect_data.name}', email='{session.prospect_data.email}', phone='{session.prospect_data.phone}', move_in='{session.prospect_data.move_in_date}', beds={session.prospect_data.beds_wanted}")
+                    # Let AI handle the missing data collection
+
+            # CRITICAL FIX: Try to parse multiple fields from user message before AI processing
+            self._parse_multiple_fields_from_message(session, message)
+
+            # ADDITIONAL FIX: If user selected a studio unit, set beds_wanted to 0
+            if not session.prospect_data.beds_wanted and "studio" in message.lower():
+                session.prospect_data.beds_wanted = 0  # Studio = 0 bedrooms
+                logger.info("   ✅ Set beds_wanted to 0 for studio unit")
+
+            # Generate AI response based on conversation context
+            ai_response = await ai_service.generate_response(session, message)
+
+            # Post-process AI response to handle specific actions
+            processed_response = await self._post_process_ai_response(session, message, ai_response)
+
+            # ENHANCED: Extract any missing data from AI response and user message
+            await self._extract_data_from_ai_context(session, message, ai_response)
+
+            # CRITICAL FIX: Check if all data is now complete after AI processing
+            # If so, automatically trigger booking regardless of explicit booking intent
+            if self._is_data_complete(session.prospect_data) and session.state != ChatState.BOOKING_CONFIRMED:
+                logger.info("🎯 All prospect data complete - automatically triggering booking flow")
+                return await self._handle_booking_intent(session)
+
+            # ENHANCED: Check if AI response indicates booking completion
+            if self._ai_indicates_booking_complete(ai_response) and session.state != ChatState.BOOKING_CONFIRMED:
+                logger.info("🤖 AI indicates booking complete - forcing booking flow")
+                # Try to extract any remaining data from the conversation
+                await self._extract_data_from_conversation_history(session)
+                if self._is_data_complete(session.prospect_data):
+                    return await self._handle_booking_intent(session)
+                else:
+                    missing_fields = self._get_missing_fields(session.prospect_data)
+                    logger.warning(f"❌ AI claims booking complete but missing: {missing_fields}")
+                    return f"I need a bit more information to complete your booking. Please provide: {', '.join(missing_fields)}"
+
+            return processed_response
+
+        except Exception as e:
+            logger.error(f"AI processing failed: {str(e)}")
+            # Fallback to basic response
+            return "I apologize for the confusion. Could you please tell me what you're looking for in an apartment?"
+
+    async def _handle_information_collection(
+        self, session: ConversationSession, message: str, field: str
+    ) -> str:
+        """Handle collection of specific information fields."""
+        if field == "name":
             return self._handle_name_collection(session, message)
-
-        elif session.state == ChatState.COLLECTING_EMAIL:
+        elif field == "email":
             return self._handle_email_collection(session, message)
-
-        elif session.state == ChatState.COLLECTING_PHONE:
+        elif field == "phone":
             return self._handle_phone_collection(session, message)
-
-        # COLLECTING_CARRIER state removed - SMS functionality disabled
-
-        elif session.state == ChatState.COLLECTING_MOVE_IN:
+        elif field == "move_in_date":
             return self._handle_move_in_collection(session, message)
-
-        elif session.state == ChatState.COLLECTING_BEDS:
+        elif field == "beds_wanted":
             return self._handle_beds_collection(session, message)
+        else:
+            return "I need a bit more information to help you. What would you like to know about our apartments?"
 
-        elif session.state == ChatState.READY_TO_BOOK:
-            return await self._handle_ready_to_book(session, message)
+    async def _post_process_ai_response(
+        self, session: ConversationSession, user_message: str, ai_response: str
+    ) -> str:
+        """Post-process AI response to handle specific actions and state updates."""
 
-        elif session.state == ChatState.BOOKING_CONFIRMED:
-            return await self._handle_post_booking(session, message)
+        # Check if AI response indicates we should move to booking
+        if any(phrase in ai_response.lower() for phrase in [
+            "book a tour", "schedule a tour", "ready to book", "confirm booking"
+        ]):
+            if self._is_data_complete(session.prospect_data):
+                session.state = ChatState.READY_TO_BOOK
 
-        return "I'm sorry, I didn't understand. Could you please try again?"
+        # Check if AI is asking for specific information
+        if "what's your name" in ai_response.lower() or "your name" in ai_response.lower():
+            session.state = ChatState.COLLECTING_NAME
+        elif "email" in ai_response.lower() and "address" in ai_response.lower():
+            session.state = ChatState.COLLECTING_EMAIL
+        elif "phone" in ai_response.lower() and "number" in ai_response.lower():
+            session.state = ChatState.COLLECTING_PHONE
+        elif "move" in ai_response.lower() and "date" in ai_response.lower():
+            session.state = ChatState.COLLECTING_MOVE_IN
+        elif "bedroom" in ai_response.lower() and ("how many" in ai_response.lower() or "looking for" in ai_response.lower()):
+            session.state = ChatState.COLLECTING_BEDS
+
+        return ai_response
+
+    def _has_booking_intent(self, message: str) -> bool:
+        """Check if message contains booking intent."""
+        booking_keywords = [
+            "book", "tour", "visit", "appointment", "schedule", "reserve",
+            "confirm", "interested in booking", "want to book", "book a tour",
+            "schedule a tour", "want it", "take it", "sign up", "yes", "sure", "okay"
+        ]
+        message_lower = message.lower()
+        has_intent = any(keyword in message_lower for keyword in booking_keywords)
+
+        logger.info(f"🔍 Checking booking intent for message: '{message[:50]}...'")
+        logger.info(f"   Booking intent detected: {'✅' if has_intent else '❌'}")
+        if has_intent:
+            matched_keywords = [kw for kw in booking_keywords if kw in message_lower]
+            logger.info(f"   Matched keywords: {matched_keywords}")
+
+        return has_intent
+
+    async def _handle_post_booking_ai(
+        self, session: ConversationSession, message: str
+    ) -> str:
+        """Handle messages after booking is confirmed using AI context."""
+        # Generate contextual response for post-booking queries
+        return await ai_service.generate_response(session, message)
 
     def _handle_greeting(self, session: ConversationSession, message: str) -> str:
         GREETING_KEYWORDS = {
@@ -387,238 +428,20 @@ class ChatService:
         except ValueError:
             return "Please specify a valid number of bedrooms (1-5)."
 
-    async def _handle_ready_to_book(
-        self, session: ConversationSession, message: str
-    ) -> str:
-        """Handle booking confirmation when user is ready."""
-        message_lower = message.lower().strip()
 
-        if self._is_booking_intent(message_lower):
-            return await self._handle_booking_intent(session)
-        elif self._is_negative_response(message_lower):
-            return await self._handle_show_alternatives(session)
-        elif self._is_different_bedroom_request(message_lower):
-            return await self._handle_different_bedroom_request(session, message)
-        else:
-            return "Would you like to book a tour for this unit? Type 'book', 'yes', or 'schedule tour' to confirm! Or say 'no' or 'show other' to see different options."
 
-    def _is_booking_intent(self, message: str) -> bool:
-        """Check if message contains booking keywords like 'book', 'tour', 'schedule'."""
-        return any(keyword in message for keyword in self.BOOKING_KEYWORDS)
 
-    def _is_apartment_search_intent(self, message: str) -> bool:
-        """Check if message contains apartment search keywords like 'apartment', 'bedroom', 'rent'."""
-        return any(keyword in message for keyword in self.APARTMENT_KEYWORDS)
-
-    def _is_negative_response(self, message: str) -> bool:
-        """Check if message contains negative keywords like 'no', 'not interested', 'pass'."""
-        negative_keywords = [
-            "no",
-            "nope",
-            "not interested",
-            "pass",
-            "skip",
-            "different",
-            "other",
-            "show other",
-            "show me other",
-            "alternatives",
-            "something else",
-        ]
-        return any(keyword in message for keyword in negative_keywords)
-
-    def _is_different_bedroom_request(self, message: str) -> bool:
-        """Check if message requests different bedroom count using regex patterns."""
-        # Look for patterns like "2 bedroom", "3 bed", "different size", etc.
-        import re
-
-        bedroom_patterns = [
-            r"\b([1-5])\s*(bed|bedroom)",
-            r"different\s*(size|bedroom|bed)",
-            r"bigger|smaller|larger|studio",
-        ]
-        return any(
-            re.search(pattern, message, re.IGNORECASE) for pattern in bedroom_patterns
-        )
-
-    async def _handle_show_alternatives(self, session: ConversationSession) -> str:
-        """Show alternative units with different bedroom counts when user rejects current unit."""
-        # Get all available units
-        all_units = inventory_service.get_all_available_units()
-
-        if not all_units:
-            return "I'm sorry, we don't have any other units available at the moment. Would you like me to put you on a waiting list?"
-
-        # Filter out the current bedroom count to show different options
-        current_beds = session.prospect_data.beds_wanted
-        different_units = [unit for unit in all_units if unit.beds != current_beds]
-
-        if not different_units:
-            # Only units with same bedroom count available
-            same_bed_units = [unit for unit in all_units if unit.beds == current_beds]
-            if len(same_bed_units) > 1:
-                # Show other units with same bedroom count
-                other_unit = next(
-                    (
-                        unit
-                        for unit in same_bed_units
-                        if unit.unit_id != session.prospect_data.unit_id
-                    ),
-                    same_bed_units[0],
-                )
-                session.prospect_data.unit_id = other_unit.unit_id
-                return (
-                    f"Here's another {current_beds}-bedroom option: "
-                    f"Unit {other_unit.unit_id} ({other_unit.sqft} sq ft, ${other_unit.rent}/month). "
-                    f"Would you like to book a tour for this one?"
-                )
-            else:
-                return "That's the only unit we have available with your preferred bedroom count. Would you like to see units with different bedroom counts?"
-
-        # Show summary of different bedroom options
-        bedroom_summary = {}
-        for unit in different_units:
-            if unit.beds not in bedroom_summary:
-                bedroom_summary[unit.beds] = []
-            bedroom_summary[unit.beds].append(unit)
-
-        response = "Here are our other available options:\n\n"
-        for beds, units in sorted(bedroom_summary.items()):
-            unit = units[0]  # Show first unit as example
-            response += f"• {beds}-bedroom: Unit {unit.unit_id} ({unit.sqft} sq ft, ${unit.rent}/month)\n"
-
-        response += "\nWhich bedroom count interests you? Just tell me the number (1, 2, 3, 4, or 5)."
-
-        # Reset to collecting beds so they can choose a different option
-        session.state = ChatState.COLLECTING_BEDS
-        return response
-
-    async def _handle_different_bedroom_request(
-        self, session: ConversationSession, message: str
-    ) -> str:
-        """Extract bedroom count from message and check inventory for that specific count."""
-        import re
-
-        # Extract bedroom count from message
-        beds_match = re.search(r"\b([1-5])\s*(bed|bedroom)", message, re.IGNORECASE)
-        if beds_match:
-            beds = int(beds_match.group(1))
-            session.prospect_data.beds_wanted = beds
-
-            # Check inventory for this bedroom count - use existing unit_id for consistency
-            preferred_unit_id = (
-                session.prospect_data.unit_id if session.prospect_data.unit_id else None
-            )
-            available_unit = inventory_service.check_inventory(beds, preferred_unit_id)
-            if available_unit:
-                session.state = ChatState.READY_TO_BOOK
-                session.prospect_data.unit_id = available_unit.unit_id
-                return (
-                    f"Great choice! I found a {beds}-bedroom unit: "
-                    f"Unit {available_unit.unit_id} ({available_unit.sqft} sq ft, ${available_unit.rent}/month). "
-                    f"Would you like to book a tour for this unit?"
-                )
-            else:
-                return f"I'm sorry, we don't have any {beds}-bedroom units available. Would you like to see other options?"
-
-        # If no specific bedroom count found, show alternatives
-        return await self._handle_show_alternatives(session)
-
-    async def _handle_apartment_search_intent(
-        self, session: ConversationSession, message: str
-    ) -> str:
-        """Handle apartment search intent regardless of current state."""
-        # If we're in greeting state, acknowledge and ask for name
-        if session.state == ChatState.GREETING:
-            return "Great! I'd love to help you find the perfect apartment. First, what's your name?"
-
-        # If we're collecting information, acknowledge but continue with current step
-        if session.state == ChatState.COLLECTING_NAME:
-            return "Perfect! I'm here to help you find an apartment. Let's start with your name. What's your name?"
-        elif session.state == ChatState.COLLECTING_EMAIL:
-            return "Excellent! I'll help you find the perfect apartment. I just need your email address first so I can send you information. What's your email?"
-        elif session.state == ChatState.COLLECTING_PHONE:
-            return "Great! I'm excited to help you find an apartment. I just need your phone number first for the booking. What's your phone number?"
-        elif session.state == ChatState.COLLECTING_MOVE_IN:
-            return "Perfect! I'll help you find the ideal apartment. When are you looking to move in? (e.g., 'January 2025', 'ASAP', '2025-07-01')"
-        elif session.state == ChatState.COLLECTING_BEDS:
-            return "Excellent! I'm here to help you find the perfect apartment. How many bedrooms are you looking for? (1, 2, 3, 4, or 5)"
-        elif session.state == ChatState.READY_TO_BOOK:
-            return "Great! I found a perfect apartment for you. Would you like to book a tour? Type 'book' or 'yes' to confirm!"
-        elif session.state == ChatState.BOOKING_CONFIRMED:
-            return "Your apartment tour is already confirmed! I'm excited to help you find your new home."
-
-        # Fallback
-        return "I'd love to help you find the perfect apartment! Let me gather some information first."
-
-    async def _handle_smart_booking_intent(
-        self, session: ConversationSession, message: str
-    ) -> str:
-        """
-        Intelligently handle booking intent based on current state and available data.
-
-        Detects booking intent and either proceeds with booking if all data is collected,
-        or guides user through remaining data collection steps before booking.
-        """
-        # If we have all the data, proceed with booking
-        if self._is_data_complete(session.prospect_data):
-            return await self._handle_booking_intent(session)
-
-        # If we're missing data, acknowledge the booking intent and guide them
-        missing_fields = self._get_missing_fields(session.prospect_data)
-
-        # Acknowledge their booking intent
-        response = "Great! I'd love to help you book a tour. "
-
-        # Handle greeting state specifically - we need to start collecting info
-        if session.state == ChatState.GREETING:
-            response += "I'll need to collect some information first. Let's start with your name. What's your name?"
-            session.state = ChatState.COLLECTING_NAME
-            return response
-
-        # Guide them to the next step based on current state
-        if session.state == ChatState.COLLECTING_NAME:
-            response += "I just need your name first. What's your name?"
-            return response
-        elif session.state == ChatState.COLLECTING_EMAIL:
-            response += "I just need your email address first so I can send you the confirmation. What's your email?"
-            return response
-        elif session.state == ChatState.COLLECTING_PHONE:
-            response += "I just need your phone number first for the booking. What's your phone number?"
-            return response
-        elif session.state == ChatState.COLLECTING_MOVE_IN:
-            response += "I just need to know when you're looking to move in. When would you like to move in? (e.g., 'January 2025', 'ASAP', '2025-07-01')"
-            return response
-        elif session.state == ChatState.COLLECTING_BEDS:
-            response += "I just need to know how many bedrooms you're looking for. How many bedrooms? (1, 2, 3, 4, or 5)"
-            return response
-        else:
-            # Fallback - list what we still need
-            response += (
-                f"I just need a bit more information: {', '.join(missing_fields)}. "
-            )
-            if "name" in missing_fields:
-                response += "Let's start with your name."
-                session.state = ChatState.COLLECTING_NAME
-            elif "email" in missing_fields:
-                response += "What's your email address?"
-                session.state = ChatState.COLLECTING_EMAIL
-            elif "phone" in missing_fields:
-                response += "What's your phone number?"
-                session.state = ChatState.COLLECTING_PHONE
-            elif "move-in date" in missing_fields:
-                response += "When are you looking to move in?"
-                session.state = ChatState.COLLECTING_MOVE_IN
-            elif "number of bedrooms" in missing_fields:
-                response += "How many bedrooms are you looking for?"
-                session.state = ChatState.COLLECTING_BEDS
-
-            return response
 
     async def _handle_booking_intent(self, session: ConversationSession) -> str:
         """Handle the actual booking process."""
+        logger.info("🚀 BOOKING INTENT TRIGGERED - Starting booking process")
+        logger.info(f"   Session ID: {session.session_id}")
+        logger.info(f"   Prospect: {session.prospect_data.name}")
+        logger.info(f"   Email: {session.prospect_data.email}")
+
         if not self._is_data_complete(session.prospect_data):
             missing_fields = self._get_missing_fields(session.prospect_data)
+            logger.warning(f"❌ Booking failed - missing data: {missing_fields}")
             return f"I need a bit more information before booking. Missing: {', '.join(missing_fields)}"
 
         # Check inventory again - use existing unit_id for consistency
@@ -645,7 +468,15 @@ class ChatService:
         )
 
         # Send email confirmation
+        logger.info("📧 CALLING EMAIL SERVICE - About to send tour confirmation")
+        logger.info(f"   Recipient: {confirmation.prospect_email}")
+        logger.info(f"   Unit: {confirmation.unit_id}")
+        logger.info(f"   Tour Date: {confirmation.tour_date}")
+        logger.info(f"   Tour Time: {confirmation.tour_time}")
+
         email_sent = await email_service.send_tour_confirmation(confirmation)
+
+        logger.info(f"📧 EMAIL SERVICE RESULT: {'SUCCESS' if email_sent else 'FAILED'}")
 
         # SMS functionality removed - email-only notifications
 
@@ -655,14 +486,16 @@ class ChatService:
             inventory_service.reserve_unit(available_unit.unit_id)
             session.prospect_data.unit_id = available_unit.unit_id
 
-            # Create response message - email-only notifications
+            # Create response message with spam folder reminder
             notification_msg = (
-                f"I've sent a confirmation email to {session.prospect_data.email}"
+                f"I've sent a confirmation email to {session.prospect_data.email}. "
+                f"Please check your inbox and spam/junk folder if you don't see it within a few minutes"
             )
 
             return (
                 f"Perfect! Your tour is confirmed for {tour_date} at {tour_time}. "
-                f"{notification_msg} with all the details. "
+                f"{notification_msg}. The email contains all the details including what to bring. "
+                f"If you have any issues, you can also call our leasing office at {email_service.leasing_office_phone}. "
                 f"We'll see you at {session.prospect_data.property_address}!"
             )
         else:
@@ -679,34 +512,7 @@ class ChatService:
                 f"💡 Please save these details for your records!"
             )
 
-    async def _handle_post_booking(
-        self, session: ConversationSession, message: str
-    ) -> str:
-        """Handle messages after booking is confirmed."""
-        message_lower = message.lower().strip()
 
-        # Check if they want to book another tour or have other questions
-        if any(
-            keyword in message_lower
-            for keyword in ["another", "different", "other unit", "more"]
-        ):
-            return "I'd be happy to help you explore other units! What type of apartment are you looking for?"
-        elif any(
-            keyword in message_lower
-            for keyword in ["thank", "thanks", "great", "perfect"]
-        ):
-            return "You're very welcome! We're excited to show you around. If you have any questions before your tour, feel free to ask!"
-        elif any(
-            keyword in message_lower
-            for keyword in ["question", "ask", "info", "detail"]
-        ):
-            return "Of course! I'm here to help. What would you like to know about the property or your upcoming tour?"
-        elif any(
-            keyword in message_lower for keyword in ["reschedule", "change", "cancel"]
-        ):
-            return f"For any changes to your tour, please contact our leasing office at {email_service.leasing_office_phone} or reply to your confirmation email."
-        else:
-            return "Your tour is all set! Is there anything else I can help you with regarding the property or your visit?"
 
     def _is_data_complete(self, data: ProspectData) -> bool:
         """
@@ -722,7 +528,7 @@ class ChatService:
                 data.phone,
                 # carrier field removed - SMS functionality disabled
                 data.move_in_date,
-                data.beds_wanted,
+                data.beds_wanted is not None,  # Allow 0 for studio units
             ]
         )
 
@@ -743,9 +549,231 @@ class ChatService:
         # carrier field removed - SMS functionality disabled
         if not data.move_in_date:
             missing.append("move-in date")
-        if not data.beds_wanted:
+        if data.beds_wanted is None:
             missing.append("number of bedrooms")
         return missing
+
+    def _parse_multiple_fields_from_message(self, session: ConversationSession, message: str):
+        """
+        Parse multiple fields from a single user message.
+        Handles cases like: "John Doe, john@example.com, 5551234567, January 2025"
+        """
+        logger.info(f"🔍 Parsing multiple fields from message: '{message[:100]}...'")
+
+        # Split by common delimiters
+        parts = re.split(r'[,;]\s*', message.strip())
+
+        if len(parts) >= 2:  # At least 2 parts to consider multi-field parsing
+            logger.info(f"   Found {len(parts)} parts: {parts}")
+
+            for i, part in enumerate(parts):
+                part = part.strip()
+
+                # Try to identify and parse each part
+                if not session.prospect_data.name and self._looks_like_name(part):
+                    session.prospect_data.name = part
+                    logger.info(f"   ✅ Parsed name: {part}")
+
+                elif not session.prospect_data.email and self._looks_like_email(part):
+                    session.prospect_data.email = part.lower()
+                    logger.info(f"   ✅ Parsed email: {part}")
+
+                elif not session.prospect_data.phone and self._looks_like_phone(part):
+                    # Clean and validate phone number
+                    cleaned_phone = re.sub(r'[^\d]', '', part)
+                    if len(cleaned_phone) == 10:
+                        session.prospect_data.phone = cleaned_phone
+                        logger.info(f"   ✅ Parsed phone: {cleaned_phone}")
+
+                elif not session.prospect_data.move_in_date and self._looks_like_date(part):
+                    session.prospect_data.move_in_date = part
+                    logger.info(f"   ✅ Parsed move-in date: {part}")
+
+                elif not session.prospect_data.beds_wanted and self._looks_like_bedroom_count(part):
+                    beds_match = re.search(r'\b([1-5])\b', part)
+                    if beds_match:
+                        session.prospect_data.beds_wanted = int(beds_match.group(1))
+                        logger.info(f"   ✅ Parsed bedrooms: {beds_match.group(1)}")
+
+    def _looks_like_name(self, text: str) -> bool:
+        """Check if text looks like a person's name."""
+        return (len(text) >= 2 and
+                re.match(r"^[a-zA-Z\s\-'\.]+$", text) and
+                not '@' in text and
+                not re.search(r'\d', text))
+
+    def _looks_like_email(self, text: str) -> bool:
+        """Check if text looks like an email address."""
+        return re.match(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", text) is not None
+
+    def _looks_like_phone(self, text: str) -> bool:
+        """Check if text looks like a phone number."""
+        cleaned = re.sub(r'[^\d]', '', text)
+        return len(cleaned) == 10 and cleaned.isdigit()
+
+    def _looks_like_date(self, text: str) -> bool:
+        """Check if text looks like a date or move-in timeframe."""
+        date_keywords = ['january', 'february', 'march', 'april', 'may', 'june',
+                        'july', 'august', 'september', 'october', 'november', 'december',
+                        'asap', 'soon', 'winter', 'spring', 'summer', 'fall', 'month']
+        text_lower = text.lower()
+        return (any(keyword in text_lower for keyword in date_keywords) or
+                re.match(r'\d{4}-\d{2}-\d{2}', text) or
+                re.search(r'\d{4}', text))
+
+    def _looks_like_bedroom_count(self, text: str) -> bool:
+        """Check if text contains bedroom count."""
+        return re.search(r'\b([1-5])\s*(bed|bedroom)', text.lower()) is not None
+
+    def _add_message(self, session: ConversationSession, sender: str, text: str):
+        """Add a message to the conversation history."""
+        message = ConversationMessage(
+            sender=sender, text=text, timestamp=datetime.now()
+        )
+        session.messages.append(message)
+
+    async def _extract_data_from_ai_context(self, session: ConversationSession, user_message: str, ai_response: str):
+        """Use AI to extract prospect data from conversation context."""
+        try:
+            # Create a prompt to extract structured data
+            extraction_prompt = f"""
+            Extract prospect information from this conversation:
+            User: {user_message}
+            Assistant: {ai_response}
+
+            Current data:
+            - Name: {session.prospect_data.name or 'Not provided'}
+            - Email: {session.prospect_data.email or 'Not provided'}
+            - Phone: {session.prospect_data.phone or 'Not provided'}
+            - Move-in date: {session.prospect_data.move_in_date or 'Not provided'}
+            - Bedrooms wanted: {session.prospect_data.beds_wanted or 'Not provided'}
+
+            Extract any missing information from the user message. Return ONLY the missing data in this exact format:
+            NAME: [extracted name or NONE]
+            EMAIL: [extracted email or NONE]
+            PHONE: [extracted phone or NONE]
+            MOVE_IN: [extracted move-in date or NONE]
+            BEDS: [extracted bedroom count or NONE]
+            UNIT: [extracted unit ID like A101, B402, C804 or NONE]
+            """
+
+            if ai_service.enabled:
+                extraction_result = await ai_service.client.chat.completions.create(
+                    model=ai_service.model,
+                    messages=[{"role": "user", "content": extraction_prompt}],
+                    max_tokens=200,
+                    temperature=0.1
+                )
+
+                extracted_text = extraction_result.choices[0].message.content
+                logger.info(f"🤖 AI extracted data: {extracted_text}")
+
+                # Parse the extracted data
+                self._parse_ai_extracted_data(session, extracted_text)
+
+        except Exception as e:
+            logger.error(f"AI data extraction failed: {str(e)}")
+
+    def _parse_ai_extracted_data(self, session: ConversationSession, extracted_text: str):
+        """Parse AI-extracted data and update session."""
+        lines = extracted_text.strip().split('\n')
+
+        for line in lines:
+            if ':' in line:
+                key, value = line.split(':', 1)
+                key = key.strip().upper()
+                value = value.strip()
+
+                if value and value.upper() != 'NONE':
+                    if key == 'NAME' and not session.prospect_data.name:
+                        session.prospect_data.name = value
+                        logger.info(f"🤖 AI extracted name: {value}")
+                    elif key == 'EMAIL' and not session.prospect_data.email:
+                        if '@' in value:
+                            session.prospect_data.email = value.lower()
+                            logger.info(f"🤖 AI extracted email: {value}")
+                    elif key == 'PHONE' and not session.prospect_data.phone:
+                        # Clean phone number
+                        phone_digits = re.sub(r'[^\d]', '', value)
+                        if len(phone_digits) == 10:
+                            session.prospect_data.phone = f"({phone_digits[:3]}) {phone_digits[3:6]}-{phone_digits[6:]}"
+                            logger.info(f"🤖 AI extracted phone: {session.prospect_data.phone}")
+                    elif key == 'MOVE_IN' and not session.prospect_data.move_in_date:
+                        session.prospect_data.move_in_date = value
+                        logger.info(f"🤖 AI extracted move-in: {value}")
+                    elif key == 'BEDS' and session.prospect_data.beds_wanted is None:
+                        # Extract number from beds description
+                        beds_match = re.search(r'\b([0-5])\b', value)
+                        if beds_match:
+                            session.prospect_data.beds_wanted = int(beds_match.group(1))
+                            logger.info(f"🤖 AI extracted beds: {beds_match.group(1)}")
+                    elif key == 'UNIT' and not session.prospect_data.unit_id:
+                        # Extract unit ID from conversation
+                        unit_match = re.search(r'\b([A-Z]\d{3}|[A-Z]\d{2}|Unit\s+[A-Z]\d{3})\b', value, re.IGNORECASE)
+                        if unit_match:
+                            unit_id = unit_match.group(1).replace('Unit ', '').upper()
+                            session.prospect_data.unit_id = unit_id
+                            logger.info(f"🤖 AI extracted unit: {unit_id}")
+
+    def _ai_indicates_booking_complete(self, ai_response: str) -> bool:
+        """Check if AI response indicates booking is complete."""
+        booking_complete_phrases = [
+            "tour is confirmed", "tour is scheduled", "confirmation email",
+            "I've sent", "email sent", "booking confirmed", "tour confirmed",
+            "scheduled your tour", "booked your tour", "reservation confirmed"
+        ]
+
+        ai_lower = ai_response.lower()
+        indicates_complete = any(phrase in ai_lower for phrase in booking_complete_phrases)
+
+        if indicates_complete:
+            logger.info(f"🤖 AI indicates booking complete with phrases: {[p for p in booking_complete_phrases if p in ai_lower]}")
+
+        return indicates_complete
+
+    async def _extract_data_from_conversation_history(self, session: ConversationSession):
+        """Extract missing data from entire conversation history using AI."""
+        try:
+            # Get recent conversation context
+            recent_messages = session.messages[-10:]  # Last 10 messages
+            conversation_text = "\n".join([f"{msg.sender}: {msg.text}" for msg in recent_messages])
+
+            missing_fields = self._get_missing_fields(session.prospect_data)
+            if not missing_fields:
+                return
+
+            extraction_prompt = f"""
+            Extract the following missing information from this conversation history:
+            Missing: {', '.join(missing_fields)}
+
+            Conversation:
+            {conversation_text}
+
+            Extract ONLY the missing information in this format:
+            NAME: [name or NONE]
+            EMAIL: [email or NONE]
+            PHONE: [phone or NONE]
+            MOVE_IN: [move-in date or NONE]
+            BEDS: [bedroom count or NONE]
+            UNIT: [unit ID like A101, B402, C804 or NONE]
+            """
+
+            if ai_service.enabled:
+                extraction_result = await ai_service.client.chat.completions.create(
+                    model=ai_service.model,
+                    messages=[{"role": "user", "content": extraction_prompt}],
+                    max_tokens=200,
+                    temperature=0.1
+                )
+
+                extracted_text = extraction_result.choices[0].message.content
+                logger.info(f"🤖 AI extracted from history: {extracted_text}")
+
+                # Parse the extracted data
+                self._parse_ai_extracted_data(session, extracted_text)
+
+        except Exception as e:
+            logger.error(f"AI history extraction failed: {str(e)}")
 
 
 # Global instance

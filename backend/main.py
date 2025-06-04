@@ -26,11 +26,23 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
-# Configure structured logging
+# Configure structured logging with enhanced visibility
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.StreamHandler(),  # Ensure console output
+    ]
 )
+
+# Set specific loggers to INFO level to ensure visibility
+logging.getLogger("email_service").setLevel(logging.INFO)
+logging.getLogger("chat_service").setLevel(logging.INFO)
+logging.getLogger("ai_service").setLevel(logging.INFO)
+logging.getLogger("inventory_service").setLevel(logging.INFO)
+
 logger = logging.getLogger(__name__)
+logger.info("🚀 Application starting - logging configured")
 
 # Initialize FastAPI application with metadata
 app = FastAPI(
@@ -46,7 +58,9 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",  # Local development frontend
+        "http://localhost:3001",  # Alternative frontend port
         "http://127.0.0.1:3000",  # Alternative local address
+        "http://127.0.0.1:3001",  # Alternative local address with port 3001
         "https://micro-service-frontend.onrender.com",  # Production deployment
         os.getenv("FRONTEND_URL", "").strip(),  # Custom frontend URL from environment
     ],

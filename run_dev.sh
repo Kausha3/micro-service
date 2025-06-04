@@ -58,9 +58,10 @@ source venv/bin/activate
 echo "Installing Python dependencies..."
 pip install -r requirements.txt
 
-# Start backend in background
+# Start backend in background with visible logs
 echo "🚀 Starting backend server on http://localhost:8000..."
-uvicorn main:app --reload --port 8000 &
+echo "📋 Backend logs will be visible in this terminal"
+uvicorn main:app --reload --port 8000 --log-level info &
 BACKEND_PID=$!
 
 # Go back to root directory
