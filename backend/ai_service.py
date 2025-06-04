@@ -34,28 +34,29 @@ class AIService:
 
     def __init__(self):
         """Initialize AI service with OpenAI client and configuration."""
-        # Configure timeout and retry settings for production deployment
-        # Render has specific networking requirements, so we use more conservative settings
+        # Configure timeout and retry settings for better reliability
         is_production = os.getenv("ENVIRONMENT") == "production"
 
-        if is_production:
-            # More conservative settings for Render deployment
-            timeout_seconds = float(
-                os.getenv("OPENAI_TIMEOUT", "30.0")
-            )  # Shorter timeout for Render
-            max_retries = int(
-                os.getenv("OPENAI_MAX_RETRIES", "2")
-            )  # Fewer retries to avoid cascading failures
-        else:
-            # Development settings
-            timeout_seconds = float(os.getenv("OPENAI_TIMEOUT", "60.0"))
-            max_retries = int(os.getenv("OPENAI_MAX_RETRIES", "3"))
+        # Get configuration from environment with improved defaults
+        timeout_seconds = float(os.getenv("OPENAI_TIMEOUT", "45.0"))
+        max_retries = int(os.getenv("OPENAI_MAX_RETRIES", "3"))
+        retry_delay = float(os.getenv("OPENAI_RETRY_DELAY", "2.0"))
 
-        self.client = AsyncOpenAI(
-            api_key=os.getenv("OPENAI_API_KEY"),
-            timeout=timeout_seconds,
-            max_retries=max_retries,
-        )
+        # Store retry configuration for use in generate_response
+        self.retry_delay = retry_delay
+        self.max_retries = max_retries
+
+        # Initialize OpenAI client with improved configuration
+        try:
+            self.client = AsyncOpenAI(
+                api_key=os.getenv("OPENAI_API_KEY"),
+                timeout=timeout_seconds,
+                max_retries=0,  # Handle retries manually for better control
+            )
+            logger.info(f"OpenAI client initialized with timeout: {timeout_seconds}s")
+        except Exception as e:
+            logger.error(f"Failed to initialize OpenAI client: {e}")
+            self.client = None
         self.model = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
         self.property_name = os.getenv(
             "PROPERTY_NAME", "Luxury Apartments at Main Street"
@@ -64,7 +65,7 @@ class AIService:
             "PROPERTY_ADDRESS", "123 Main St, Anytown, ST 12345"
         )
 
-        # Validate API key (allow test keys for testing)
+        # Validate API key and client initialization
         api_key = os.getenv("OPENAI_API_KEY")
         is_test_env = os.getenv("ENVIRONMENT") == "test"
 
@@ -72,9 +73,10 @@ class AIService:
             not api_key
             or api_key == "your_openai_api_key_here"
             or (not is_test_env and api_key == "test-key-mock")
+            or self.client is None
         ):
             logger.warning(
-                "OpenAI API key not configured. AI features will be disabled."
+                "OpenAI API key not configured or client initialization failed. AI features will be disabled."
             )
             self.enabled = False
         else:
@@ -85,7 +87,7 @@ class AIService:
                 )
             else:
                 logger.info(
-                    f"AI service initialized with model: {self.model} (timeout: {timeout_seconds}s, retries: {max_retries})"
+                    f"AI service initialized with model: {self.model} (timeout: {timeout_seconds}s, retries: {max_retries}, delay: {retry_delay}s)"
                 )
 
     async def generate_response(
@@ -101,15 +103,12 @@ class AIService:
         Returns:
             str: AI-generated response
         """
-        if not self.enabled:
+        if not self.enabled or self.client is None:
             return "I'm sorry, AI features are currently unavailable. Please ensure the OpenAI API key is configured."
 
-        # Retry logic for network resilience - optimized for Render deployment
-        is_production = os.getenv("ENVIRONMENT") == "production"
-        max_attempts = (
-            2 if is_production else 3
-        )  # Fewer attempts in production to avoid cascading failures
-        base_delay = 0.5 if is_production else 1.0  # Shorter delays in production
+        # Improved retry logic with configurable settings
+        max_attempts = self.max_retries
+        base_delay = self.retry_delay
 
         for attempt in range(max_attempts):
             try:
@@ -125,8 +124,8 @@ class AIService:
                 )
 
                 # Generate response using OpenAI with retry logic
-                # Use shorter max_tokens in production to reduce response time
-                max_tokens = 300 if is_production else 500
+                # Use reasonable max_tokens for response generation
+                max_tokens = 500
 
                 response = await self.client.chat.completions.create(
                     model=self.model,
@@ -157,6 +156,10 @@ class AIService:
                     logger.warning(
                         "This may be a network connectivity issue with OpenAI's servers"
                     )
+                elif "timeout" in error_msg.lower():
+                    logger.warning(
+                        f"Request timed out. Consider increasing OPENAI_TIMEOUT (current: {self.client.timeout}s)"
+                    )
 
                 if attempt < max_attempts - 1:
                     delay = base_delay * (2**attempt)  # Exponential backoff
@@ -164,6 +167,7 @@ class AIService:
                     await asyncio.sleep(delay)
                 else:
                     logger.error("All AI connection attempts failed")
+                    logger.error(f"Final error: {error_msg}")
                     return "I'm experiencing connectivity issues. Please try again in a moment."
 
             except RateLimitError as e:
@@ -386,5 +390,13 @@ IMPORTANT EMAIL GUIDANCE:
         return None
 
 
-# Global service instance
-ai_service = AIService()
+# Global service instance - lazy initialization
+ai_service = None
+
+
+def get_ai_service():
+    """Get or create the AI service instance"""
+    global ai_service
+    if ai_service is None:
+        ai_service = AIService()
+    return ai_service

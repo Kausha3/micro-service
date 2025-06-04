@@ -6,7 +6,7 @@ from typing import Optional
 
 import dateparser
 
-from ai_service import ai_service
+from ai_service import get_ai_service
 from email_service import email_service
 from inventory_service import inventory_service
 from models import (
@@ -172,7 +172,7 @@ class ChatService:
                 return await self._handle_post_booking_ai(session, message)
 
             # Check if we need to collect specific information for booking
-            missing_field = await ai_service.should_collect_information(
+            missing_field = await get_ai_service().should_collect_information(
                 session, message
             )
             if missing_field:
@@ -267,7 +267,7 @@ class ChatService:
                 logger.info("   ✅ Set beds_wanted to 0 for studio unit")
 
             # Generate AI response based on conversation context
-            ai_response = await ai_service.generate_response(session, message)
+            ai_response = await get_ai_service().generate_response(session, message)
 
             # Post-process AI response to handle specific actions
             processed_response = await self._post_process_ai_response(
@@ -416,7 +416,7 @@ class ChatService:
     ) -> str:
         """Handle messages after booking is confirmed using AI context."""
         # Generate contextual response for post-booking queries
-        return await ai_service.generate_response(session, message)
+        return await get_ai_service().generate_response(session, message)
 
     def _handle_greeting(self, session: ConversationSession, message: str) -> str:
         GREETING_KEYWORDS = {
@@ -999,9 +999,10 @@ class ChatService:
             UNIT: [extracted unit ID like A101, B402, C804 or NONE]
             """
 
-            if ai_service.enabled:
-                extraction_result = await ai_service.client.chat.completions.create(
-                    model=ai_service.model,
+            ai_svc = get_ai_service()
+            if ai_svc.enabled:
+                extraction_result = await ai_svc.client.chat.completions.create(
+                    model=ai_svc.model,
                     messages=[{"role": "user", "content": extraction_prompt}],
                     max_tokens=200,
                     temperature=0.1,
@@ -1123,6 +1124,7 @@ class ChatService:
             UNIT: [unit ID like A101, B402, C804 or NONE]
             """
 
+            ai_service = get_ai_service()
             if ai_service.enabled:
                 extraction_result = await ai_service.client.chat.completions.create(
                     model=ai_service.model,
@@ -1149,9 +1151,15 @@ class ChatService:
         for unit_id in session.prospect_data.selected_units:
             unit = inventory_service.get_unit_by_id(unit_id)
             if unit:
+                # Format units using the same structured format as apartment listings
+                # This will be rendered as clickable cards in the frontend
+                bed_bath = (
+                    f"{unit.beds} bed/{unit.baths} bath"
+                    if unit.beds > 0
+                    else "Studio/1 bath"
+                )
                 unit_details.append(
-                    f"• Unit {unit.unit_id}: {unit.beds} bed/{unit.baths} bath, "
-                    f"{unit.sqft} sq ft, ${unit.rent:,}/month"
+                    f"• Unit {unit.unit_id} | {bed_bath} | {unit.sqft} sq ft | ${unit.rent:,}/month"
                 )
 
         if not unit_details:

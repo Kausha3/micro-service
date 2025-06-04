@@ -621,13 +621,25 @@ Email: {self.smtp_email}
     ) -> str:
         """Create enhanced plain text email content for multiple bookings."""
 
-        # Create unit details section
+        # Create unit details section with improved formatting
         unit_details = []
         for unit in confirmation.booked_units:
-            unit_details.append(
-                f"  • Unit {unit.unit_id}: {unit.beds} bed/{unit.baths} bath, "
-                f"{unit.sqft} sq ft, ${unit.rent:,}/month (Confirmation: {unit.confirmation_number})"
+            # Format baths to show whole numbers without decimal
+            baths_str = (
+                f"{int(unit.baths)}"
+                if unit.baths == int(unit.baths)
+                else f"{unit.baths}"
             )
+            bed_bath = (
+                f"{unit.beds} bed/{baths_str} bath"
+                if unit.beds > 0
+                else "Studio/1 bath"
+            )
+            unit_details.append(
+                f"  • Unit {unit.unit_id}: {bed_bath}, "
+                f"{unit.sqft} sq ft, ${unit.rent:,}/month"
+            )
+            unit_details.append(f"    Confirmation #: {unit.confirmation_number}")
 
         unit_details_text = "\n".join(unit_details)
 
@@ -678,25 +690,36 @@ Email: {self.smtp_email}
     ) -> str:
         """Create enhanced HTML email content for multiple bookings."""
 
-        # Create unit details section
+        # Create unit details section with improved mobile formatting
         unit_details_html = []
         for unit in confirmation.booked_units:
+            # Format baths to show whole numbers without decimal
+            baths_str = (
+                f"{int(unit.baths)}"
+                if unit.baths == int(unit.baths)
+                else f"{unit.baths}"
+            )
+            bed_bath = (
+                f"{unit.beds} bed / {baths_str} bath"
+                if unit.beds > 0
+                else "Studio / 1 bath"
+            )
             unit_details_html.append(
                 f"""
                 <tr>
-                    <td style="padding: 10px; border-bottom: 1px solid #eee;">
-                        <strong>Unit {unit.unit_id}</strong>
+                    <td style="padding: 12px 8px; border-bottom: 1px solid #eee; font-weight: bold; color: #2c3e50;">
+                        Unit {unit.unit_id}
                     </td>
-                    <td style="padding: 10px; border-bottom: 1px solid #eee;">
-                        {unit.beds} bed / {unit.baths} bath
+                    <td style="padding: 12px 8px; border-bottom: 1px solid #eee; color: #34495e;">
+                        {bed_bath}
                     </td>
-                    <td style="padding: 10px; border-bottom: 1px solid #eee;">
+                    <td style="padding: 12px 8px; border-bottom: 1px solid #eee; color: #7f8c8d;">
                         {unit.sqft} sq ft
                     </td>
-                    <td style="padding: 10px; border-bottom: 1px solid #eee;">
+                    <td style="padding: 12px 8px; border-bottom: 1px solid #eee; font-weight: bold; color: #27ae60;">
                         ${unit.rent:,}/month
                     </td>
-                    <td style="padding: 10px; border-bottom: 1px solid #eee; font-size: 12px; color: #666;">
+                    <td style="padding: 12px 8px; border-bottom: 1px solid #eee; font-size: 11px; color: #666; font-family: monospace;">
                         {unit.confirmation_number}
                     </td>
                 </tr>
@@ -709,21 +732,36 @@ Email: {self.smtp_email}
 <!DOCTYPE html>
 <html>
 <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
-        .container {{ max-width: 700px; margin: 0 auto; padding: 20px; }}
-        .header {{ background-color: #2c3e50; color: white; padding: 20px; text-align: center; }}
-        .content {{ padding: 20px; background-color: #f9f9f9; }}
-        .details {{ background-color: white; padding: 15px; border-left: 4px solid #3498db; margin: 20px 0; }}
-        .units-table {{ background-color: white; padding: 15px; border-left: 4px solid #9b59b6; margin: 20px 0; }}
-        .bring-list {{ background-color: white; padding: 15px; border-left: 4px solid #e74c3c; margin: 20px 0; }}
-        .contact-info {{ background-color: white; padding: 15px; border-left: 4px solid #27ae60; margin: 20px 0; }}
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }}
+        .container {{ max-width: 700px; margin: 0 auto; padding: 10px; }}
+        .header {{ background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%); color: white; padding: 25px 20px; text-align: center; border-radius: 8px 8px 0 0; }}
+        .header h1 {{ margin: 0; font-size: 24px; font-weight: 600; }}
+        .content {{ padding: 20px; background-color: #f8f9fa; border-radius: 0 0 8px 8px; }}
+        .details {{ background-color: white; padding: 20px; border-left: 4px solid #3498db; margin: 20px 0; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
+        .units-table {{ background-color: white; padding: 20px; border-left: 4px solid #9b59b6; margin: 20px 0; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
+        .bring-list {{ background-color: white; padding: 20px; border-left: 4px solid #e74c3c; margin: 20px 0; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
+        .contact-info {{ background-color: white; padding: 20px; border-left: 4px solid #27ae60; margin: 20px 0; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
         .footer {{ text-align: center; padding: 20px; color: #666; }}
-        table {{ width: 100%; border-collapse: collapse; margin: 10px 0; }}
-        th {{ background-color: #f8f9fa; padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6; }}
-        td {{ padding: 10px; border-bottom: 1px solid #eee; }}
+        table {{ width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 14px; }}
+        th {{ background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); padding: 14px 8px; text-align: left; border-bottom: 2px solid #dee2e6; font-weight: 600; color: #495057; }}
+        td {{ padding: 12px 8px; border-bottom: 1px solid #eee; vertical-align: top; }}
         ul {{ margin: 10px 0; padding-left: 20px; }}
-        .highlight {{ background-color: #fff3cd; padding: 10px; border-radius: 5px; margin: 10px 0; }}
+        .highlight {{ background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%); padding: 15px; border-radius: 6px; margin: 15px 0; border-left: 4px solid #f39c12; }}
+        code {{ background-color: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-family: 'SF Mono', Monaco, monospace; font-size: 13px; }}
+
+        /* Mobile responsiveness */
+        @media only screen and (max-width: 600px) {{
+            .container {{ padding: 5px; }}
+            .header {{ padding: 20px 15px; }}
+            .header h1 {{ font-size: 20px; }}
+            .content {{ padding: 15px; }}
+            .details, .units-table, .bring-list, .contact-info {{ padding: 15px; margin: 15px 0; }}
+            table {{ font-size: 12px; }}
+            th, td {{ padding: 8px 4px; }}
+            th {{ font-size: 11px; }}
+        }}
     </style>
 </head>
 <body>

@@ -37,6 +37,11 @@ Requires environment variables for:
 import logging
 import os
 
+# Load environment variables from .env file
+# This must be called before importing any modules that use environment variables
+# Ensure we load from the correct path regardless of working directory
+import pathlib
+
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -45,9 +50,8 @@ from fastapi.responses import JSONResponse
 import routes
 from models import ChatResponse
 
-# Load environment variables from .env file
-# This must be called before importing any modules that use environment variables
-load_dotenv()
+env_path = pathlib.Path(__file__).parent / ".env"
+load_dotenv(dotenv_path=env_path)
 
 # Configure structured logging with enhanced visibility for production monitoring
 # Uses ISO timestamp format and structured message format for log aggregation
