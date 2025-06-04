@@ -1,4 +1,5 @@
 import pytest
+
 from inventory_service import InventoryService
 from models import Unit
 

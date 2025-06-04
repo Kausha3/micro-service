@@ -1,24 +1,53 @@
 """
 Inventory Service for Lead-to-Lease Chat Concierge
 
-This module provides apartment unit inventory management with realistic
-simulation features including:
-- Diverse unit types (studio to 4-bedroom)
-- Randomized availability to simulate real-world scenarios
-- Unit reservation and tracking
-- Mock data that represents a typical apartment complex
+A comprehensive apartment unit inventory management service that provides realistic
+simulation of apartment availability and booking for the Lead-to-Lease Chat Concierge.
 
-In production, this would integrate with property management systems
-like Yardi, RealPage, or AppFolio.
+## Core Features
+- **Diverse Unit Portfolio**: Studio through 4-bedroom apartments with realistic pricing
+- **Availability Simulation**: 15% unavailability rate to demonstrate real-world scenarios
+- **Unit Reservation System**: Track and manage unit bookings and availability
+- **Realistic Data**: Market-rate pricing, square footage, and amenity variations
+- **Flexible Querying**: Search by bedroom count, specific unit ID, or availability
+
+## Unit Types and Pricing Structure
+- **Studio Units**: 450-500 sq ft, $1,500-1,600/month (Entry-level options)
+- **1-Bedroom Units**: 650-750 sq ft, $1,800-2,000/month (Most popular)
+- **2-Bedroom Units**: 950-1,100 sq ft, $2,400-2,700/month (Family-friendly)
+- **3-Bedroom Units**: 1,200-1,350 sq ft, $3,200-3,500/month (Spacious living)
+- **4-Bedroom Units**: 1,600-1,750 sq ft, $4,200-4,500/month (Premium options)
+
+## Availability Simulation
+Implements realistic availability patterns:
+- **85% Base Availability**: Most units available for immediate booking
+- **15% Unavailability Rate**: Simulates real-world scenarios (maintenance, occupied, etc.)
+- **Consistent Session Behavior**: Same unit offered consistently within a conversation
+- **Preferred Unit Handling**: Bypasses randomization for specific unit requests
+
+## Production Integration
+In production environments, this service would integrate with:
+- **Property Management Systems**: Yardi, RealPage, AppFolio, Entrata
+- **Real-time Availability APIs**: Live inventory data from PMS
+- **Pricing Engines**: Dynamic pricing based on market conditions
+- **Maintenance Systems**: Unit availability based on maintenance schedules
+
+## Business Logic
+- **Lead Qualification**: Matches prospects with appropriate unit types
+- **Booking Workflow**: Reserves units upon tour confirmation
+- **Inventory Tracking**: Maintains accurate availability status
+- **Alternative Suggestions**: Offers similar units when preferred options unavailable
 
 Author: Augment Agent
 Version: 1.0.0
+License: MIT
 """
 
-from models import Unit
-from typing import Optional, List
-import random
 import logging
+import random
+from typing import List, Optional
+
+from models import Unit
 
 logger = logging.getLogger(__name__)
 
@@ -27,14 +56,41 @@ class InventoryService:
     """
     Intelligent inventory service with realistic apartment unit simulation.
 
-    Features:
-    - Comprehensive unit variety (studio through 4-bedroom)
-    - Randomized availability (15% unavailability rate)
-    - Unit reservation tracking
-    - Realistic pricing and square footage
+    This service manages the complete apartment inventory lifecycle for the Lead-to-Lease
+    Chat Concierge, providing realistic simulation of apartment availability, pricing,
+    and booking workflows.
 
-    In production, this would connect to property management systems
-    for real-time inventory data.
+    ## Key Responsibilities
+    - **Inventory Management**: Maintain comprehensive apartment unit database
+    - **Availability Checking**: Real-time availability queries with realistic simulation
+    - **Unit Reservation**: Handle booking and reservation workflows
+    - **Data Consistency**: Ensure consistent unit information across conversations
+    - **Business Logic**: Implement realistic availability patterns and pricing
+
+    ## Simulation Features
+    - **Realistic Unavailability**: 15% of units randomly unavailable to simulate real-world scenarios
+    - **Consistent Behavior**: Same unit offered consistently within a conversation session
+    - **Preferred Unit Handling**: Direct unit requests bypass availability simulation
+    - **Market-Rate Pricing**: Realistic rent prices based on bedroom count and square footage
+
+    ## Unit Portfolio
+    The service maintains a diverse portfolio of 15 apartment units:
+    - 3 Studio units (0 bed): Entry-level pricing for budget-conscious renters
+    - 4 One-bedroom units: Most popular option for singles and couples
+    - 4 Two-bedroom units: Family-friendly options with varied layouts
+    - 2 Three-bedroom units: Spacious options for larger families
+    - 2 Four-bedroom units: Premium options for maximum space
+
+    ## Production Considerations
+    In production environments, this service would:
+    - Connect to property management system APIs (Yardi, RealPage, AppFolio)
+    - Implement real-time availability updates
+    - Handle complex pricing rules and lease terms
+    - Integrate with maintenance and occupancy systems
+    - Support multiple properties and unit types
+
+    Attributes:
+        units (List[Unit]): Complete inventory of apartment units
     """
 
     def __init__(self):
@@ -148,7 +204,8 @@ class InventoryService:
 
         # Simulate realistic unavailability (15% chance) only for new searches
         # This demonstrates the "no availability" conversation flow
-        if random.random() < 0.15:
+        # nosec B311 - Using random for demo simulation, not cryptographic purposes
+        if random.random() < 0.15:  # nosec B311
             logger.info(f"Simulating unavailability for {beds}-bedroom units")
             return None
 
@@ -210,21 +267,6 @@ class InventoryService:
             f"Failed to reserve unit: {unit_id} (not found or already reserved)"
         )
         return False
-
-    def get_unit_by_id(self, unit_id: str) -> Optional[Unit]:
-        """
-        Get unit details by unit ID.
-
-        Args:
-            unit_id (str): Unique unit identifier
-
-        Returns:
-            Optional[Unit]: Unit details if found, None otherwise
-        """
-        for unit in self.units:
-            if unit.unit_id == unit_id:
-                return unit
-        return None
 
 
 # Global service instance for application use

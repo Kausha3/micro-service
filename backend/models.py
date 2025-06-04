@@ -14,12 +14,13 @@ Author: Augment Agent
 Version: 1.0.0
 """
 
-from pydantic import BaseModel, EmailStr, field_validator
-from typing import Optional
+import os
+import re
 from datetime import datetime
 from enum import Enum
-import re
-import os
+from typing import Optional
+
+from pydantic import BaseModel, EmailStr, field_validator
 
 
 class ChatState(str, Enum):
@@ -148,7 +149,9 @@ class ProspectData(BaseModel):
         if v is None:
             return v
         if v < 0 or v > 5:  # Allow 0 for studio units
-            raise ValueError("Number of bedrooms must be between 0 and 5 (0 for studio)")
+            raise ValueError(
+                "Number of bedrooms must be between 0 and 5 (0 for studio)"
+            )
         return v
 
 

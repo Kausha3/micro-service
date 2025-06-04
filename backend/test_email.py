@@ -1,8 +1,7 @@
 import pytest
-
 from dotenv import load_dotenv
-from email_service import EmailService
 
+from email_service import EmailService
 
 # Load environment variables
 load_dotenv()
@@ -32,8 +31,9 @@ async def test_email_config():
 async def test_smtp_connection():
     """Test basic SMTP connection without sending email."""
     try:
-        import aiosmtplib
         import ssl
+
+        import aiosmtplib
 
         service = EmailService()
 

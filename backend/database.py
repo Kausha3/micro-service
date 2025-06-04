@@ -1,12 +1,15 @@
-from sqlalchemy import create_engine, Column, String, Text, DateTime
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
 from datetime import datetime
+from typing import Generator
 
+from sqlalchemy import Column, DateTime, String, Text, create_engine
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import Session, sessionmaker
+
+# Create declarative base for SQLAlchemy models
 Base = declarative_base()
 
 
-class ConversationDB(Base):
+class ConversationDB(Base):  # type: ignore[valid-type,misc]
     __tablename__ = "conversations"
 
     id = Column(String, primary_key=True)
@@ -23,7 +26,7 @@ Base.metadata.create_all(engine)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
-def get_db():
+def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
     try:
         yield db

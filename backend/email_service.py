@@ -1,13 +1,15 @@
-import aiosmtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from models import TourConfirmation, MultipleBookingConfirmation, BookedUnit
+import asyncio
+import logging
 import os
 import uuid
 from datetime import datetime, timedelta
-import logging
-import asyncio
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+
+import aiosmtplib
 from dotenv import load_dotenv
+
+from models import MultipleBookingConfirmation, TourConfirmation
 
 # Load environment variables
 load_dotenv()
@@ -17,8 +19,54 @@ logger = logging.getLogger(__name__)
 
 class EmailService:
     """
-    Email service for sending tour confirmation emails.
-    Uses SMTP (Gmail by default) to send emails.
+    Professional email service for apartment tour confirmations and notifications.
+
+    This service handles all email communications for the Lead-to-Lease Chat Concierge,
+    providing reliable, professional email delivery with comprehensive error handling
+    and retry logic for production environments.
+
+    ## Key Features
+    - **Multi-Provider SMTP Support**: Configurable for Gmail, Outlook, and other providers
+    - **Professional Templates**: Mobile-responsive HTML emails with property branding
+    - **Retry Logic**: Exponential backoff for reliable delivery in production
+    - **Multiple Booking Support**: Comprehensive emails for multi-unit bookings
+    - **Delivery Tracking**: Detailed logging for monitoring and debugging
+    - **Configuration Validation**: Startup validation of email settings
+
+    ## Email Types
+    1. **Single Tour Confirmation**: Individual apartment tour booking
+    2. **Multiple Tour Confirmation**: Multi-unit tour booking with detailed tables
+    3. **Error Notifications**: Internal error reporting (future enhancement)
+
+    ## SMTP Configuration
+    Supports standard SMTP providers with environment variables:
+    - SMTP_EMAIL: Sender email address
+    - SMTP_PASSWORD: App password or SMTP password
+    - SMTP_SERVER: SMTP server hostname (default: smtp.gmail.com)
+    - SMTP_PORT: SMTP port (default: 587 for TLS)
+
+    ## Template Features
+    - **Mobile-Responsive Design**: Optimized for all devices
+    - **Professional Branding**: Property name and contact information
+    - **Clear Call-to-Actions**: What to bring, contact information
+    - **Accessibility**: High contrast, readable fonts
+    - **Deliverability**: Proper headers and formatting for spam prevention
+
+    ## Error Handling
+    - **Authentication Errors**: Clear guidance for Gmail App Passwords
+    - **Network Timeouts**: Configurable timeout with retry logic
+    - **SMTP Errors**: Detailed error logging and graceful degradation
+    - **Configuration Validation**: Startup checks for missing settings
+
+    Attributes:
+        smtp_email (str): Configured sender email address
+        smtp_password (str): SMTP authentication password
+        smtp_server (str): SMTP server hostname
+        smtp_port (int): SMTP server port
+        property_address (str): Property address for email content
+        leasing_office_phone (str): Contact phone number
+        property_name (str): Property name for branding
+        email_timeout (int): SMTP timeout in seconds
     """
 
     def __init__(self):
@@ -63,7 +111,9 @@ class EmailService:
 
         # Validate recipient email address
         if not confirmation.prospect_email or "@" not in confirmation.prospect_email:
-            logger.error(f"❌ Invalid recipient email address: {confirmation.prospect_email}")
+            logger.error(
+                f"❌ Invalid recipient email address: {confirmation.prospect_email}"
+            )
             return False
 
         logger.info("✅ Email configuration and recipient validation passed")
@@ -196,7 +246,9 @@ class EmailService:
             logger.info(f"   Message size: {len(str(message))} bytes")
 
             # Important delivery notes
-            logger.info(f"📧 DELIVERY STATUS: Email successfully submitted to SMTP server")
+            logger.info(
+                f"📧 DELIVERY STATUS: Email successfully submitted to SMTP server"
+            )
             logger.info(f"📧 NEXT STEPS: Email should arrive within 1-5 minutes")
             logger.info(f"📧 USER GUIDANCE: Check inbox and spam/junk folder")
 
@@ -228,7 +280,11 @@ class EmailService:
             logger.error("SMTP_EMAIL is not configured")
             return False
 
-        if not self.smtp_password or self.smtp_password == "your-app-password":
+        # nosec B105 - Checking for default placeholder password, not hardcoded secret
+        if (
+            not self.smtp_password
+            or self.smtp_password == "your-app-password"  # nosec B105
+        ):
             logger.error("SMTP_PASSWORD is not configured")
             return False
 
@@ -361,16 +417,24 @@ Email: {self.smtp_email}
 </html>
         """.strip()
 
-    async def send_multiple_booking_confirmation(self, confirmation: MultipleBookingConfirmation) -> bool:
+    async def send_multiple_booking_confirmation(
+        self, confirmation: MultipleBookingConfirmation
+    ) -> bool:
         """
         Send a multiple booking confirmation email to the prospect with retry logic.
         Returns True if successful, False otherwise.
         """
-        logger.info("🚀 MULTIPLE BOOKING EMAIL SERVICE CALLED - Starting multiple tour confirmation email process")
+        logger.info(
+            "🚀 MULTIPLE BOOKING EMAIL SERVICE CALLED - Starting multiple tour confirmation email process"
+        )
         logger.info(f"   📧 Recipient: {confirmation.prospect_email}")
-        logger.info(f"   🏠 Units: {[unit.unit_id for unit in confirmation.booked_units]}")
+        logger.info(
+            f"   🏠 Units: {[unit.unit_id for unit in confirmation.booked_units]}"
+        )
         logger.info(f"   👤 Prospect: {confirmation.prospect_name}")
-        logger.info(f"   📋 Master Confirmation: {confirmation.master_confirmation_number}")
+        logger.info(
+            f"   📋 Master Confirmation: {confirmation.master_confirmation_number}"
+        )
 
         # Validate email configuration
         if not self._validate_email_config():
@@ -390,14 +454,20 @@ Email: {self.smtp_email}
 
         for attempt in range(max_retries):
             try:
-                logger.info(f"📧 Multiple booking email sending attempt {attempt + 1}/{max_retries}")
+                logger.info(
+                    f"📧 Multiple booking email sending attempt {attempt + 1}/{max_retries}"
+                )
                 success = await self._send_multiple_booking_email_attempt(confirmation)
                 if success:
-                    logger.info(f"✅ Multiple booking email sent successfully on attempt {attempt + 1}")
+                    logger.info(
+                        f"✅ Multiple booking email sent successfully on attempt {attempt + 1}"
+                    )
                     return True
 
             except Exception as e:
-                logger.warning(f"⚠️ Multiple booking email attempt {attempt + 1} failed: {str(e)}")
+                logger.warning(
+                    f"⚠️ Multiple booking email attempt {attempt + 1} failed: {str(e)}"
+                )
                 if attempt < max_retries - 1:  # Don't sleep on last attempt
                     logger.info(f"🔄 Retrying in {retry_delay} seconds...")
                     await asyncio.sleep(retry_delay)
@@ -406,7 +476,9 @@ Email: {self.smtp_email}
         logger.error(f"❌ All {max_retries} multiple booking email attempts failed")
         return False
 
-    async def _send_multiple_booking_email_attempt(self, confirmation: MultipleBookingConfirmation) -> bool:
+    async def _send_multiple_booking_email_attempt(
+        self, confirmation: MultipleBookingConfirmation
+    ) -> bool:
         """
         Single attempt to send multiple booking email with proper error handling.
         """
@@ -415,10 +487,14 @@ Email: {self.smtp_email}
             logger.info(f"🎯 Processing multiple booking confirmation:")
             logger.info(f"   Prospect: {confirmation.prospect_name}")
             logger.info(f"   Email: {confirmation.prospect_email}")
-            logger.info(f"   Units: {[unit.unit_id for unit in confirmation.booked_units]}")
+            logger.info(
+                f"   Units: {[unit.unit_id for unit in confirmation.booked_units]}"
+            )
             logger.info(f"   Date: {confirmation.tour_date}")
             logger.info(f"   Time: {confirmation.tour_time}")
-            logger.info(f"   Master Confirmation: {confirmation.master_confirmation_number}")
+            logger.info(
+                f"   Master Confirmation: {confirmation.master_confirmation_number}"
+            )
 
             # Create email message with proper headers for better deliverability
             message = MIMEMultipart("alternative")
@@ -477,8 +553,8 @@ Email: {self.smtp_email}
                 logger.error(f"SMTP operation failed: {str(smtp_error)}")
                 try:
                     await smtp_client.quit()
-                except:
-                    pass  # Ignore errors during cleanup
+                except Exception as cleanup_error:
+                    logger.debug(f"SMTP cleanup error (ignored): {cleanup_error}")
                 raise smtp_error
 
             # Log successful delivery with timestamp
@@ -486,7 +562,9 @@ Email: {self.smtp_email}
             logger.info(f"🎉 MULTIPLE BOOKING EMAIL DELIVERY SUCCESS at {delivery_time}")
             logger.info(f"   ✅ Recipient: {confirmation.prospect_email}")
             logger.info(f"   ✅ Units: {unit_list}")
-            logger.info(f"   ✅ Master Confirmation: {confirmation.master_confirmation_number}")
+            logger.info(
+                f"   ✅ Master Confirmation: {confirmation.master_confirmation_number}"
+            )
             logger.info(f"   ✅ From: {self.smtp_email}")
             logger.info(f"   ✅ SMTP Server: {self.smtp_server}:{self.smtp_port}")
 
@@ -534,7 +612,9 @@ Email: {self.smtp_email}
         """
         return f"CONF-{uuid.uuid4().hex[:6].upper()}"
 
-    def _create_multiple_booking_text_content(self, confirmation: MultipleBookingConfirmation) -> str:
+    def _create_multiple_booking_text_content(
+        self, confirmation: MultipleBookingConfirmation
+    ) -> str:
         """Create enhanced plain text email content for multiple bookings."""
 
         # Create unit details section
@@ -589,13 +669,16 @@ Phone: {self.leasing_office_phone}
 Email: {self.smtp_email}
         """.strip()
 
-    def _create_multiple_booking_html_content(self, confirmation: MultipleBookingConfirmation) -> str:
+    def _create_multiple_booking_html_content(
+        self, confirmation: MultipleBookingConfirmation
+    ) -> str:
         """Create enhanced HTML email content for multiple bookings."""
 
         # Create unit details section
         unit_details_html = []
         for unit in confirmation.booked_units:
-            unit_details_html.append(f"""
+            unit_details_html.append(
+                f"""
                 <tr>
                     <td style="padding: 10px; border-bottom: 1px solid #eee;">
                         <strong>Unit {unit.unit_id}</strong>
@@ -613,7 +696,8 @@ Email: {self.smtp_email}
                         {unit.confirmation_number}
                     </td>
                 </tr>
-            """)
+            """
+            )
 
         unit_table_rows = "".join(unit_details_html)
 

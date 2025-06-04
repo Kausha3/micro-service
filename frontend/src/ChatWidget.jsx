@@ -475,7 +475,7 @@ function ChatWidget() {
             </div>
           </div>
         ))}
-        
+
         {isLoading && (
           <div className="message assistant">
             <div className="message-content">
@@ -488,7 +488,7 @@ function ChatWidget() {
             </div>
           </div>
         )}
-        
+
         <div ref={messagesEndRef} />
       </div>
 
@@ -530,7 +530,7 @@ function ChatWidget() {
             </svg>
           </button>
         </div>
-        
+
         <div className="chat-hints">
           <span>💡 Try: &ldquo;I&apos;m looking for a 2-bedroom apartment&rdquo; or click units to select multiple apartments</span>
         </div>

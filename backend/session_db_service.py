@@ -8,8 +8,8 @@ import logging
 from datetime import datetime
 from typing import Optional
 
-from database import SessionLocal, ConversationDB
-from models import ConversationSession, ProspectData, ChatState, ConversationMessage
+from database import ConversationDB, SessionLocal
+from models import ChatState, ConversationMessage, ConversationSession, ProspectData
 
 logger = logging.getLogger(__name__)
 

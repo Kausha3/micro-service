@@ -1,4 +1,5 @@
 import pytest
+
 from chat_service import ChatService
 from models import ChatMessage, ChatState
 

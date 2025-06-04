@@ -445,15 +445,15 @@
   .chat-widget {
     height: 400px;
   }
-  
+
   .chat-messages {
     padding: 15px;
   }
-  
+
   .message {
     max-width: 90%;
   }
-  
+
   .chat-input-container {
     padding: 10px 15px;
   }

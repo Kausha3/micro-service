@@ -163,4 +163,43 @@ email_templates/*.html
 *.key
 *.crt
 *.cert
+
+# AI/ML specific
+*.pkl
+*.model
+*.weights
+.openai_cache/
+*.joblib
+
+# IDE specific additions
+.vscode/settings.json
+.idea/workspace.xml
+*.swp
+*.swo
+
+# OS specific additions
+*.tmp
+*.temp
+.DS_Store?
+
+# Build artifacts
+*.tar.gz
+*.zip
+*.rar
+
+# Additional Python artifacts
+*.egg
+*.egg-info/
+.mypy_cache/
+.pytest_cache/
+.coverage.*
+htmlcov/
+
+# Additional Node.js artifacts
+.npm
+.yarn-integrity
+yarn-error.log
+.pnp.*
+.yarn/
+
 .dockerignore

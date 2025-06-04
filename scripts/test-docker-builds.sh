@@ -33,16 +33,16 @@ build_and_test() {
     local dockerfile=$2
     local tag=$3
     local test_command=$4
-    
+
     echo ""
     echo "Building $tag..."
     echo "Context: $context"
     echo "Dockerfile: $dockerfile"
-    
+
     # Build the image
     if docker build -t "$tag" -f "$dockerfile" "$context"; then
         print_status "Successfully built $tag"
-        
+
         # Test the image if test command provided
         if [ -n "$test_command" ]; then
             echo "Testing $tag..."

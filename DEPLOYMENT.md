@@ -3,6 +3,7 @@
 ## Deploying to Render
 
 ### Backend Deployment
+
 1. Create a new Web Service on Render
 2. Connect your GitHub repository
 3. Set the following:
@@ -15,6 +16,7 @@
    - `FRONTEND_URL`: Your frontend URL (after deploying frontend)
 
 ### Frontend Deployment
+
 1. Create a new Static Site on Render
 2. Connect your GitHub repository
 3. Set the following:
@@ -24,5 +26,6 @@
    - `VITE_API_URL`: Your backend URL from above
 
 ### Post-Deployment
+
 1. Update your backend's `FRONTEND_URL` environment variable
 2. Test the chat flow end-to-end

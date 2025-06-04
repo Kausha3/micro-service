@@ -10,32 +10,75 @@ Author: Augment Agent
 Version: 1.0.0
 """
 
+import logging
+
 from fastapi import HTTPException
-from models import ChatMessage
+
 from chat_service import chat_service
 from inventory_service import inventory_service
-import logging
+from models import ChatMessage
 
 logger = logging.getLogger(__name__)
 
 
 async def root():
     """
-    Health check endpoint.
+    API Health Check and Information
+
+    Returns comprehensive API status, version information, and available features.
+    This endpoint is used for health monitoring, service discovery, and API documentation.
+
+    **Use Cases:**
+    - Health monitoring and uptime checks
+    - Service discovery and capability detection
+    - API version verification
+    - Integration testing and validation
+
+    **Response Format:**
+    - `message`: API name and description
+    - `status`: Current service health status
+    - `version`: API version following semantic versioning
+    - `features`: List of available capabilities
+    - `endpoints`: Available API endpoints with descriptions
+    - `documentation`: Links to API documentation
+
+    **Tags:** Health
 
     Returns:
-        dict: API status, version, and basic information
+        dict: Comprehensive API status and information
     """
     return {
         "message": "Lead-to-Lease Chat Concierge API",
         "status": "healthy",
         "version": "1.0.0",
+        "description": "AI-powered chat microservice for apartment leasing with automated lead qualification",
         "features": [
-            "Natural language conversation",
-            "Automated lead qualification",
-            "Email notifications",
-            "Session persistence",
+            "AI-powered natural language conversation",
+            "Automated lead qualification and data collection",
+            "Real-time apartment inventory management",
+            "Professional email notifications with retry logic",
+            "Multi-unit booking support",
+            "Session persistence and conversation history",
+            "OpenAPI/Swagger documentation",
         ],
+        "endpoints": {
+            "/": "API health check and information",
+            "/chat": "AI-powered conversation processing",
+            "/inventory": "Apartment unit availability",
+            "/sessions/{id}": "Conversation session details",
+            "/docs": "Interactive API documentation (Swagger UI)",
+            "/redoc": "Alternative API documentation (ReDoc)",
+        },
+        "documentation": {
+            "interactive": "/docs",
+            "alternative": "/redoc",
+            "openapi_spec": "/openapi.json",
+        },
+        "contact": {
+            "name": "Augment Agent",
+            "email": "dev@augmentcode.com",
+        },
+        "license": "MIT",
     }
 
 

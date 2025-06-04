@@ -15,27 +15,27 @@ Author: Augment Agent
 Version: 1.0.0
 """
 
-import pytest
-
 from datetime import datetime
+from unittest.mock import MagicMock, patch
+
+import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import patch, MagicMock
+
+from chat_service import ChatService
+from email_service import EmailService
+from inventory_service import InventoryService
 
 # Import application modules
 from main import app
 from models import (
     ChatMessage,
-    ProspectData,
-    ConversationSession,
     ChatState,
     ConversationMessage,
+    ConversationSession,
+    ProspectData,
     TourConfirmation,
 )
-from chat_service import ChatService
-from email_service import EmailService
-from inventory_service import InventoryService
 from session_db_service import SessionDatabaseService
-
 
 # Test client for API testing
 client = TestClient(app)

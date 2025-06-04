@@ -7,6 +7,7 @@ This document describes the transformation of the Lead-to-Lease Chat Concierge f
 ## 🚀 What's New
 
 ### AI-Powered Natural Language Understanding
+
 - **Natural Conversation Flow**: Users can now ask questions in any format:
   - "What do you have available for me?"
   - "I'm looking for a 2-bedroom apartment"
@@ -14,11 +15,13 @@ This document describes the transformation of the Lead-to-Lease Chat Concierge f
   - "What's the price range for your properties?"
 
 ### Intelligent Database Integration
+
 - **Contextual Responses**: AI queries the property database to provide relevant, accurate information
 - **Dynamic Inventory Awareness**: Responses include real-time availability, pricing, and unit details
 - **Smart Filtering**: AI understands user preferences and filters results accordingly
 
 ### Enhanced Conversation Management
+
 - **Context Retention**: Maintains conversation history and context throughout the session
 - **Intelligent Follow-ups**: Asks relevant questions based on user responses
 - **Flexible Information Collection**: Gathers required data (name, email, phone, move-in date) naturally
@@ -26,13 +29,16 @@ This document describes the transformation of the Lead-to-Lease Chat Concierge f
 ## 🛠️ Setup Instructions
 
 ### 1. Install Dependencies
+
 ```bash
 cd backend
 pip install -r requirements.txt
 ```
 
 ### 2. Configure OpenAI API Key
+
 Edit `backend/.env` and add your OpenAI API key:
+
 ```env
 OPENAI_API_KEY=your_actual_openai_api_key_here
 OPENAI_MODEL=gpt-3.5-turbo
@@ -41,12 +47,14 @@ OPENAI_MODEL=gpt-3.5-turbo
 **Note**: You can get an API key from [OpenAI's website](https://platform.openai.com/api-keys)
 
 ### 3. Test AI Integration
+
 ```bash
 cd backend
 python test_ai_integration.py
 ```
 
 ### 4. Start the Application
+
 ```bash
 # Backend
 cd backend
@@ -61,16 +69,19 @@ npm run dev
 ## 🧠 AI Features
 
 ### Natural Language Processing
+
 - **Intent Detection**: Automatically understands user goals (searching, booking, inquiring)
 - **Entity Extraction**: Identifies bedroom preferences, budget constraints, move-in dates
 - **Context Awareness**: Remembers previous conversation points
 
 ### Intelligent Responses
+
 - **Database-Driven**: Responses based on actual available inventory
 - **Personalized**: Tailored to user preferences and requirements
 - **Contextual**: Considers conversation history and current state
 
 ### Conversation Flow
+
 - **Adaptive**: Adjusts flow based on user responses
 - **Non-Linear**: Users can ask questions in any order
 - **Graceful Handling**: Manages unclear or ambiguous requests
@@ -95,6 +106,7 @@ npm run dev
    - Maintains existing data structures
 
 ### Backward Compatibility
+
 - **Existing Database**: All current database models preserved
 - **Email System**: Tour confirmation emails work unchanged
 - **Frontend**: No changes required to the chat interface
@@ -103,6 +115,7 @@ npm run dev
 ## 🎯 Usage Examples
 
 ### Natural Language Queries
+
 ```
 User: "Hi, I'm looking for an apartment"
 AI: "Hello! I'd be happy to help you find the perfect apartment. What type of place are you looking for?"
@@ -118,7 +131,9 @@ AI: "Perfect! I'd love to schedule that tour for you. I'll need a few details. W
 ```
 
 ### Flexible Information Collection
+
 The AI naturally collects required information without rigid forms:
+
 - Name, email, phone number
 - Move-in date preferences
 - Bedroom requirements
@@ -127,7 +142,9 @@ The AI naturally collects required information without rigid forms:
 ## 🔧 Configuration Options
 
 ### AI Model Selection
+
 In `.env`, you can choose different models:
+
 ```env
 OPENAI_MODEL=gpt-3.5-turbo      # Fast, cost-effective
 OPENAI_MODEL=gpt-4              # More sophisticated responses
@@ -135,7 +152,9 @@ OPENAI_MODEL=gpt-4-turbo-preview # Latest capabilities
 ```
 
 ### Fallback Behavior
+
 If AI is unavailable:
+
 - System gracefully falls back to helpful responses
 - Core booking functionality remains operational
 - Users receive clear error messages
@@ -143,16 +162,20 @@ If AI is unavailable:
 ## 🧪 Testing
 
 ### AI Integration Test
+
 ```bash
 python test_ai_integration.py
 ```
+
 Tests:
+
 - AI service initialization
 - Conversation scenarios
 - Inventory context integration
 - Error handling
 
 ### Manual Testing Scenarios
+
 1. **Property Search**: "What apartments do you have?"
 2. **Specific Requirements**: "I need a 3-bedroom with parking"
 3. **Budget Inquiries**: "What's your cheapest unit?"
@@ -177,16 +200,19 @@ Tests:
    - Session persistence maintained
 
 ### Fallback Mode
+
 If AI fails, the system provides helpful fallback responses while maintaining core functionality.
 
 ## 📈 Performance Considerations
 
 ### Response Times
+
 - AI responses typically take 1-3 seconds
 - Cached responses for common queries
 - Graceful loading indicators in frontend
 
 ### Cost Management
+
 - Uses efficient prompt engineering
 - Conversation context limited to recent messages
 - Configurable model selection for cost optimization
@@ -194,6 +220,7 @@ If AI fails, the system provides helpful fallback responses while maintaining co
 ## 🔮 Future Enhancements
 
 ### Potential Improvements
+
 1. **Voice Integration**: Add speech-to-text capabilities
 2. **Multi-language Support**: Expand to other languages
 3. **Advanced Analytics**: Track conversation patterns
@@ -201,6 +228,7 @@ If AI fails, the system provides helpful fallback responses while maintaining co
 5. **Integration**: Connect with property management systems
 
 ### Scalability
+
 - Designed for easy horizontal scaling
 - Stateless AI processing
 - Database-backed session management
@@ -208,6 +236,7 @@ If AI fails, the system provides helpful fallback responses while maintaining co
 ## 📞 Support
 
 For questions or issues:
+
 1. Check this documentation
 2. Review error logs in the console
 3. Test with `test_ai_integration.py`
