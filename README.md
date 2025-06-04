@@ -251,23 +251,117 @@ AI_MAX_TOKENS=500              # Response length limit
 AI_CONTEXT_LIMIT=10            # Conversation history limit
 ```
 
+### **AI Setup and Testing**
+
+#### **Quick AI Integration Test**
+
+```bash
+cd backend
+python test_ai_integration.py
+```
+
+This tests:
+- AI service initialization
+- Conversation scenarios with mocked responses
+- Inventory context integration
+- Error handling and fallback behavior
+
+#### **Manual Testing Scenarios**
+
+1. **Property Search**: "What apartments do you have?"
+2. **Specific Requirements**: "I need a 3-bedroom with parking"
+3. **Budget Inquiries**: "What's your cheapest unit?"
+4. **Booking Flow**: "I want to schedule a tour"
+5. **Edge Cases**: Unclear or ambiguous requests
+
+### **AI Troubleshooting**
+
+#### **Common Issues**
+
+1. **AI Not Responding**
+   - Check OpenAI API key in `.env`
+   - Verify internet connection and API quota/billing
+   - Test key at [OpenAI Playground](https://platform.openai.com/playground)
+
+2. **Import Errors**
+   - Ensure dependencies installed: `pip install -r requirements.txt`
+   - Check Python version compatibility (3.10+)
+
+3. **Performance Issues**
+   - AI responses typically take 1-3 seconds
+   - Uses efficient prompt engineering and context limiting
+   - Configurable model selection for cost optimization
+
+#### **Fallback Behavior**
+
+If AI is unavailable, the system:
+- Gracefully falls back to helpful responses
+- Maintains core booking functionality
+- Provides clear error messages to users
+
 ---
 
-### Render Deployment
+### **Render Deployment (Recommended)**
 
-The application is ready for deployment on Render. Follow these steps:
+The application is ready for deployment on Render with automatic configuration detection.
 
-**⚠️ Important**: Ensure all environment variables are properly configured. See `RENDER_DEPLOYMENT_TROUBLESHOOTING.md` for common issues and solutions.
+#### **Backend Deployment**
 
-1. **Push to GitHub**: Commit and push your code to a GitHub repository
-2. **Connect to Render**:
-   - Go to [render.com](https://render.com)
-   - Connect your GitHub repository
-   - Render will automatically detect the `render.yaml` configuration
-3. **Set Environment Variables** in your Render dashboard:
-   - `SMTP_EMAIL`: Your Gmail address
-   - `SMTP_PASSWORD`: Your Gmail app password (not your regular password)
-   - `PROPERTY_ADDRESS`: Property address for emails
+1. **Create Web Service**: Create a new Web Service on Render
+2. **Connect Repository**: Connect your GitHub repository
+3. **Configure Build Settings**:
+   - Build Command: `pip install -r backend/requirements.txt`
+   - Start Command: `cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT`
+
+4. **Set Environment Variables**:
+   ```bash
+   # AI Configuration (Required)
+   OPENAI_API_KEY=your_actual_openai_api_key_here
+   OPENAI_MODEL=gpt-3.5-turbo
+   OPENAI_TIMEOUT=60.0
+   OPENAI_MAX_RETRIES=3
+
+   # Email Configuration
+   SMTP_EMAIL=your-email@gmail.com
+   SMTP_PASSWORD=your-16-character-app-password
+
+   # Property Information
+   PROPERTY_ADDRESS=123 Main St, Anytown, ST 12345
+   PROPERTY_NAME=Luxury Apartments at Main Street
+   LEASING_OFFICE_PHONE=(555) 123-4567
+
+   # Application Settings
+   FRONTEND_URL=https://your-frontend-url.onrender.com
+   ```
+
+#### **Frontend Deployment**
+
+1. **Create Static Site**: Create a new Static Site on Render
+2. **Configure Build Settings**:
+   - Build Command: `cd frontend && npm install && npm run build`
+   - Publish Directory: `frontend/dist`
+3. **Set Environment Variable**:
+   - `VITE_API_URL`: Your backend URL from above
+
+#### **Post-Deployment Steps**
+
+1. Update backend's `FRONTEND_URL` environment variable with frontend URL
+2. Test the complete chat flow end-to-end
+3. Monitor logs for any connection errors
+
+#### **Render Troubleshooting**
+
+**OpenAI Connection Issues:**
+- Verify `OPENAI_API_KEY` is set correctly in environment variables
+- Test your API key at [OpenAI Playground](https://platform.openai.com/playground)
+- Check OpenAI account billing and credit balance
+- Set `OPENAI_TIMEOUT=60.0` for better reliability on Render
+- Monitor Render logs for specific error messages
+
+**Email Issues:**
+- Use Gmail app passwords (not regular password)
+- Enable 2-Factor Authentication on Gmail account
+- Verify SMTP settings match Gmail requirements
 
 ## 🧪 **Testing & Code Quality**
 
