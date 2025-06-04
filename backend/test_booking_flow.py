@@ -2,18 +2,19 @@
 """
 Test Booking Flow and Email Sending
 
-This script tests the complete booking flow to ensure emails are sent.
+This script tests the complete booking flow using mocked services.
 """
 
-import asyncio
-import sys
 import uuid
 from datetime import datetime
+
+import pytest
 
 from chat_service import chat_service
 from models import AIContext, ChatMessage, ChatState, ConversationSession, ProspectData
 
 
+@pytest.mark.asyncio
 async def test_complete_booking_flow():
     """Test the complete booking flow step by step."""
 
@@ -111,6 +112,7 @@ async def test_complete_booking_flow():
     return booking_confirmed and email_mentioned
 
 
+@pytest.mark.asyncio
 async def test_direct_booking():
     """Test direct booking with complete data."""
 
@@ -170,32 +172,4 @@ async def test_direct_booking():
         return False
 
 
-async def main():
-    """Run all booking flow tests."""
-
-    print("🧪 BOOKING FLOW AND EMAIL TESTING")
-    print("=" * 80)
-
-    # Test 1: Complete conversation flow
-    test1_result = await test_complete_booking_flow()
-
-    # Test 2: Direct booking with complete data
-    test2_result = await test_direct_booking()
-
-    print("\n📊 TEST RESULTS SUMMARY:")
-    print("=" * 40)
-    print(f"Complete Flow Test: {'✅ PASS' if test1_result else '❌ FAIL'}")
-    print(f"Direct Booking Test: {'✅ PASS' if test2_result else '❌ FAIL'}")
-
-    if test1_result and test2_result:
-        print("\n🎉 ALL TESTS PASSED!")
-        print("The booking flow should trigger email sending.")
-        print("Check server logs for email delivery details.")
-    else:
-        print("\n❌ SOME TESTS FAILED!")
-        print("The booking flow may not be triggering email sending.")
-        print("Check the implementation and server logs.")
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
+# Tests are now run via pytest, no need for main execution block

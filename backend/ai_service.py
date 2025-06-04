@@ -41,10 +41,14 @@ class AIService:
             "PROPERTY_ADDRESS", "123 Main St, Anytown, ST 12345"
         )
 
-        # Validate API key
+        # Validate API key (allow test keys for testing)
+        api_key = os.getenv("OPENAI_API_KEY")
+        is_test_env = os.getenv("ENVIRONMENT") == "test"
+
         if (
-            not os.getenv("OPENAI_API_KEY")
-            or os.getenv("OPENAI_API_KEY") == "your_openai_api_key_here"
+            not api_key
+            or api_key == "your_openai_api_key_here"
+            or (not is_test_env and api_key == "test-key-mock")
         ):
             logger.warning(
                 "OpenAI API key not configured. AI features will be disabled."
@@ -52,7 +56,12 @@ class AIService:
             self.enabled = False
         else:
             self.enabled = True
-            logger.info(f"AI service initialized with model: {self.model}")
+            if is_test_env:
+                logger.info(
+                    f"AI service initialized in test mode with model: {self.model}"
+                )
+            else:
+                logger.info(f"AI service initialized with model: {self.model}")
 
     async def generate_response(
         self, session: ConversationSession, user_message: str
