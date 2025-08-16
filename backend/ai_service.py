@@ -62,10 +62,10 @@ class AIService:
         except Exception as e:
             logger.error(f"Failed to initialize Gemini client: {e}")
             self.model = None
-            
+
         # ThreadPoolExecutor for async compatibility since Gemini doesn't have native async
         self.executor = ThreadPoolExecutor(max_workers=5)
-        
+
         self.property_name = os.getenv(
             "PROPERTY_NAME", "Luxury Apartments at Main Street"
         )
@@ -139,9 +139,7 @@ class AIService:
                 # Generate response using Gemini with async wrapper
                 loop = asyncio.get_event_loop()
                 response = await loop.run_in_executor(
-                    self.executor,
-                    self._generate_content_sync,
-                    full_prompt
+                    self.executor, self._generate_content_sync, full_prompt
                 )
 
                 if response:
@@ -151,7 +149,10 @@ class AIService:
                 else:
                     raise Exception("Empty response from Gemini")
 
-            except (google_exceptions.DeadlineExceeded, google_exceptions.ServiceUnavailable) as e:
+            except (
+                google_exceptions.DeadlineExceeded,
+                google_exceptions.ServiceUnavailable,
+            ) as e:
                 error_msg = str(e)
                 logger.warning(
                     f"AI connection error on attempt {attempt + 1}/{max_attempts}: {error_msg}"
@@ -200,11 +201,14 @@ class AIService:
             raise
 
     def _build_gemini_prompt(
-        self, system_prompt: str, conversation_history: List[Dict[str, str]], user_message: str
+        self,
+        system_prompt: str,
+        conversation_history: List[Dict[str, str]],
+        user_message: str,
     ) -> str:
         """
         Build a single prompt for Gemini combining system prompt, conversation history, and user message.
-        
+
         Gemini doesn't use role-based messages like OpenAI, so we format everything into a single prompt.
         """
         prompt_parts = [
@@ -213,16 +217,16 @@ class AIService:
             "\n---\n",
             "Conversation History:",
         ]
-        
+
         # Add conversation history
         for msg in conversation_history:
             role = "Assistant" if msg["role"] == "assistant" else "User"
             prompt_parts.append(f"{role}: {msg['content']}")
-        
+
         # Add current user message
         prompt_parts.append(f"\nUser: {user_message}")
         prompt_parts.append("\nAssistant:")
-        
+
         return "\n".join(prompt_parts)
 
     def _create_system_prompt(self, available_units: List[Unit], prospect_data) -> str:
