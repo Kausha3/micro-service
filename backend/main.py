@@ -139,6 +139,10 @@ app = FastAPI(
             "name": "Sessions",
             "description": "Conversation session management and history",
         },
+        {
+            "name": "Debug",
+            "description": "Diagnostic endpoints for troubleshooting",
+        },
     ],
 )
 
@@ -166,6 +170,7 @@ app.post("/chat", response_model=ChatResponse)(routes.chat_endpoint)
 
 app.get("/inventory")(routes.get_inventory)
 app.get("/sessions/{session_id}")(routes.get_session)
+app.get("/debug/ai-status")(routes.debug_ai_status)
 
 
 @app.exception_handler(Exception)

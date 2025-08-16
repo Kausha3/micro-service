@@ -1001,14 +1001,8 @@ class ChatService:
 
             ai_svc = get_ai_service()
             if ai_svc.enabled:
-                extraction_result = await ai_svc.client.chat.completions.create(
-                    model=ai_svc.model,
-                    messages=[{"role": "user", "content": extraction_prompt}],
-                    max_tokens=200,
-                    temperature=0.1,
-                )
-
-                extracted_text = extraction_result.choices[0].message.content
+                # Use the AI service's generate_response method for extraction
+                extracted_text = await ai_svc.generate_response(session, extraction_prompt)
                 logger.info(f"🤖 AI extracted data: {extracted_text}")
 
                 # Parse the extracted data
@@ -1126,14 +1120,8 @@ class ChatService:
 
             ai_service = get_ai_service()
             if ai_service.enabled:
-                extraction_result = await ai_service.client.chat.completions.create(
-                    model=ai_service.model,
-                    messages=[{"role": "user", "content": extraction_prompt}],
-                    max_tokens=200,
-                    temperature=0.1,
-                )
-
-                extracted_text = extraction_result.choices[0].message.content
+                # Use the AI service's generate_response method for extraction
+                extracted_text = await ai_service.generate_response(session, extraction_prompt)
                 logger.info(f"🤖 AI extracted from history: {extracted_text}")
 
                 # Parse the extracted data

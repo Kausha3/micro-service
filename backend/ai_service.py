@@ -53,7 +53,7 @@ class AIService:
             api_key = os.getenv("GEMINI_API_KEY")
             if api_key:
                 genai.configure(api_key=api_key)
-                self.model_name = os.getenv("GEMINI_MODEL", "gemini-pro")
+                self.model_name = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
                 self.model = genai.GenerativeModel(self.model_name)
                 logger.info(f"Gemini client initialized with model: {self.model_name}")
             else:
