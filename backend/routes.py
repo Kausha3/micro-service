@@ -8,12 +8,14 @@ remains in dedicated service modules.
 """
 
 import logging
+import os
 
 from fastapi import HTTPException
 
 from chat_service import chat_service
 from inventory_service import inventory_service
 from models import ChatMessage
+from ai_service import get_ai_service
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +65,7 @@ async def root():
             "/chat": "AI-powered conversation processing",
             "/inventory": "Apartment unit availability",
             "/sessions/{id}": "Conversation session details",
+            "/debug/ai-status": "AI service diagnostic information",
             "/docs": "Interactive API documentation (Swagger UI)",
             "/redoc": "Alternative API documentation (ReDoc)",
         },
@@ -179,3 +182,128 @@ async def get_session(session_id: str):
     except Exception as e:
         logger.error(f"Error fetching session {session_id}: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Error fetching session")
+
+
+async def debug_ai_status():
+    """
+    AI Service Diagnostic Endpoint
+    
+    Provides detailed information about the AI service configuration and status.
+    This endpoint is useful for debugging AI-related issues in production.
+    
+    **Use Cases:**
+    - Debugging AI service initialization failures
+    - Verifying AI provider configuration
+    - Checking API key presence without exposing it
+    - Identifying model configuration issues
+    
+    **Response Format:**
+    - `ai_enabled`: Whether AI features are enabled
+    - `provider`: AI provider being used (Gemini/OpenAI)
+    - `model`: AI model being used
+    - `api_key_present`: Whether API key is configured (without revealing it)
+    - `api_key_valid`: Whether API key format is valid
+    - `initialization_status`: Status of AI service initialization
+    - `configuration`: Additional configuration details
+    - `errors`: Any initialization errors encountered
+    
+    **Tags:** Debug, Health
+    
+    Returns:
+        dict: Comprehensive AI service status and configuration
+    """
+    try:
+        # Get the AI service instance
+        ai_svc = get_ai_service()
+        
+        # Check environment variables
+        gemini_key = os.getenv("GEMINI_API_KEY")
+        openai_key = os.getenv("OPENAI_API_KEY")
+        
+        # Determine which provider is configured
+        provider = None
+        api_key_present = False
+        api_key_valid = False
+        
+        if gemini_key:
+            provider = "Gemini"
+            api_key_present = True
+            # Check if it's not a placeholder
+            api_key_valid = (
+                gemini_key != "your_gemini_api_key_here" 
+                and len(gemini_key) > 10
+                and gemini_key != "test-key-mock"
+            )
+        elif openai_key:
+            provider = "OpenAI"
+            api_key_present = True
+            # Check if it's not a placeholder
+            api_key_valid = (
+                openai_key.startswith("sk-") 
+                and len(openai_key) > 20
+            )
+        
+        # Build response
+        response = {
+            "ai_enabled": ai_svc.enabled if hasattr(ai_svc, 'enabled') else False,
+            "provider": provider or "None",
+            "model": None,
+            "api_key_present": api_key_present,
+            "api_key_valid": api_key_valid,
+            "initialization_status": "unknown",
+            "configuration": {},
+            "errors": []
+        }
+        
+        # Get model information based on provider
+        if provider == "Gemini" and hasattr(ai_svc, 'model_name'):
+            response["model"] = ai_svc.model_name
+            response["configuration"]["timeout"] = getattr(ai_svc, 'timeout_seconds', 'not set')
+            response["configuration"]["max_retries"] = getattr(ai_svc, 'max_retries', 'not set')
+            response["configuration"]["retry_delay"] = getattr(ai_svc, 'retry_delay', 'not set')
+        elif provider == "OpenAI" and hasattr(ai_svc, 'model'):
+            response["model"] = ai_svc.model
+        
+        # Check initialization status
+        if hasattr(ai_svc, 'model'):
+            if ai_svc.model is not None:
+                response["initialization_status"] = "success"
+            else:
+                response["initialization_status"] = "failed"
+                response["errors"].append("AI model client is None")
+        else:
+            response["initialization_status"] = "not_initialized"
+            response["errors"].append("AI service does not have model attribute")
+        
+        # Check for common configuration issues
+        if not api_key_present:
+            response["errors"].append("No AI API key found in environment")
+        elif not api_key_valid:
+            response["errors"].append("API key appears to be a placeholder or invalid format")
+        
+        # Add environment information
+        response["configuration"]["environment"] = os.getenv("ENVIRONMENT", "not set")
+        response["configuration"]["property_name"] = getattr(ai_svc, 'property_name', 'not set')
+        response["configuration"]["property_address"] = getattr(ai_svc, 'property_address', 'not set')
+        
+        # Add service health check
+        if response["ai_enabled"] and response["initialization_status"] == "success":
+            response["health_status"] = "healthy"
+        else:
+            response["health_status"] = "unhealthy"
+        
+        return response
+        
+    except Exception as e:
+        logger.error(f"Error checking AI status: {str(e)}", exc_info=True)
+        return {
+            "ai_enabled": False,
+            "provider": "Unknown",
+            "model": "Unknown",
+            "api_key_present": False,
+            "api_key_valid": False,
+            "initialization_status": "error",
+            "configuration": {},
+            "errors": [f"Failed to check AI status: {str(e)}"],
+            "health_status": "error"
+        }
