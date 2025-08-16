@@ -1,7 +1,7 @@
 """
 AI Service for Lead-to-Lease Chat Concierge
 
-This module provides AI-powered conversation capabilities using OpenAI's GPT models.
+This module provides AI-powered conversation capabilities using Google's Gemini models.
 Features include:
 - Natural language understanding and intent detection
 - Contextual conversation management
@@ -14,9 +14,10 @@ import asyncio
 import logging
 import os
 from typing import Dict, List, Optional, Union
+from concurrent.futures import ThreadPoolExecutor
 
-from openai import AsyncOpenAI
-from openai._exceptions import APIConnectionError, APITimeoutError, RateLimitError
+import google.generativeai as genai
+from google.api_core import exceptions as google_exceptions
 
 from inventory_service import inventory_service
 from models import ConversationSession, Unit
@@ -26,38 +27,45 @@ logger = logging.getLogger(__name__)
 
 class AIService:
     """
-    AI-powered conversation service using OpenAI GPT models.
+    AI-powered conversation service using Google Gemini models.
 
     Provides natural language understanding, intent detection, and intelligent
     response generation for apartment leasing conversations.
     """
 
     def __init__(self):
-        """Initialize AI service with OpenAI client and configuration."""
+        """Initialize AI service with Gemini client and configuration."""
         # Configure timeout and retry settings for better reliability
         is_production = os.getenv("ENVIRONMENT") == "production"
 
         # Get configuration from environment with improved defaults
-        timeout_seconds = float(os.getenv("OPENAI_TIMEOUT", "45.0"))
-        max_retries = int(os.getenv("OPENAI_MAX_RETRIES", "3"))
-        retry_delay = float(os.getenv("OPENAI_RETRY_DELAY", "2.0"))
+        timeout_seconds = float(os.getenv("GEMINI_TIMEOUT", "45.0"))
+        max_retries = int(os.getenv("GEMINI_MAX_RETRIES", "3"))
+        retry_delay = float(os.getenv("GEMINI_RETRY_DELAY", "2.0"))
 
         # Store retry configuration for use in generate_response
         self.retry_delay = retry_delay
         self.max_retries = max_retries
+        self.timeout_seconds = timeout_seconds
 
-        # Initialize OpenAI client with improved configuration
+        # Initialize Gemini client with improved configuration
         try:
-            self.client = AsyncOpenAI(
-                api_key=os.getenv("OPENAI_API_KEY"),
-                timeout=timeout_seconds,
-                max_retries=0,  # Handle retries manually for better control
-            )
-            logger.info(f"OpenAI client initialized with timeout: {timeout_seconds}s")
+            api_key = os.getenv("GEMINI_API_KEY")
+            if api_key:
+                genai.configure(api_key=api_key)
+                self.model_name = os.getenv("GEMINI_MODEL", "gemini-pro")
+                self.model = genai.GenerativeModel(self.model_name)
+                logger.info(f"Gemini client initialized with model: {self.model_name}")
+            else:
+                logger.error("GEMINI_API_KEY not found in environment")
+                self.model = None
         except Exception as e:
-            logger.error(f"Failed to initialize OpenAI client: {e}")
-            self.client = None
-        self.model = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
+            logger.error(f"Failed to initialize Gemini client: {e}")
+            self.model = None
+            
+        # ThreadPoolExecutor for async compatibility since Gemini doesn't have native async
+        self.executor = ThreadPoolExecutor(max_workers=5)
+        
         self.property_name = os.getenv(
             "PROPERTY_NAME", "Luxury Apartments at Main Street"
         )
@@ -66,28 +74,28 @@ class AIService:
         )
 
         # Validate API key and client initialization
-        api_key = os.getenv("OPENAI_API_KEY")
+        api_key = os.getenv("GEMINI_API_KEY")
         is_test_env = os.getenv("ENVIRONMENT") == "test"
 
         if (
             not api_key
-            or api_key == "your_openai_api_key_here"
+            or api_key == "your_gemini_api_key_here"
             or (not is_test_env and api_key == "test-key-mock")
-            or self.client is None
+            or self.model is None
         ):
             logger.warning(
-                "OpenAI API key not configured or client initialization failed. AI features will be disabled."
+                "Gemini API key not configured or client initialization failed. AI features will be disabled."
             )
             self.enabled = False
         else:
             self.enabled = True
             if is_test_env:
                 logger.info(
-                    f"AI service initialized in test mode with model: {self.model}"
+                    f"AI service initialized in test mode with model: {self.model_name}"
                 )
             else:
                 logger.info(
-                    f"AI service initialized with model: {self.model} (timeout: {timeout_seconds}s, retries: {max_retries}, delay: {retry_delay}s)"
+                    f"AI service initialized with model: {self.model_name} (timeout: {timeout_seconds}s, retries: {max_retries}, delay: {retry_delay}s)"
                 )
 
     async def generate_response(
@@ -103,8 +111,8 @@ class AIService:
         Returns:
             str: AI-generated response
         """
-        if not self.enabled or self.client is None:
-            return "I'm sorry, AI features are currently unavailable. Please ensure the OpenAI API key is configured."
+        if not self.enabled or self.model is None:
+            return "I'm sorry, AI features are currently unavailable. Please ensure the Gemini API key is configured."
 
         # Improved retry logic with configurable settings
         max_attempts = self.max_retries
@@ -123,42 +131,36 @@ class AIService:
                     available_units, session.prospect_data
                 )
 
-                # Generate response using OpenAI with retry logic
-                # Use reasonable max_tokens for response generation
-                max_tokens = 500
-
-                response = await self.client.chat.completions.create(
-                    model=self.model,
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        *conversation_history,
-                        {"role": "user", "content": user_message},
-                    ],
-                    temperature=0.7,
-                    max_tokens=max_tokens,
+                # Build the full prompt for Gemini (combining system prompt, history, and user message)
+                full_prompt = self._build_gemini_prompt(
+                    system_prompt, conversation_history, user_message
                 )
 
-                ai_response = response.choices[0].message.content.strip()
+                # Generate response using Gemini with async wrapper
+                loop = asyncio.get_event_loop()
+                response = await loop.run_in_executor(
+                    self.executor,
+                    self._generate_content_sync,
+                    full_prompt
+                )
 
-                # Update AI context
-                await self._update_ai_context(session, user_message, ai_response)
+                if response:
+                    # Update AI context
+                    await self._update_ai_context(session, user_message, response)
+                    return response
+                else:
+                    raise Exception("Empty response from Gemini")
 
-                return ai_response
-
-            except (APIConnectionError, APITimeoutError) as e:
+            except (google_exceptions.DeadlineExceeded, google_exceptions.ServiceUnavailable) as e:
                 error_msg = str(e)
                 logger.warning(
                     f"AI connection error on attempt {attempt + 1}/{max_attempts}: {error_msg}"
                 )
 
                 # Log additional context for debugging
-                if "Connection error" in error_msg:
+                if "deadline" in error_msg.lower():
                     logger.warning(
-                        "This may be a network connectivity issue with OpenAI's servers"
-                    )
-                elif "timeout" in error_msg.lower():
-                    logger.warning(
-                        f"Request timed out. Consider increasing OPENAI_TIMEOUT (current: {self.client.timeout}s)"
+                        f"Request timed out. Consider increasing GEMINI_TIMEOUT (current: {self.timeout_seconds}s)"
                     )
 
                 if attempt < max_attempts - 1:
@@ -170,7 +172,7 @@ class AIService:
                     logger.error(f"Final error: {error_msg}")
                     return "I'm experiencing connectivity issues. Please try again in a moment."
 
-            except RateLimitError as e:
+            except google_exceptions.ResourceExhausted as e:
                 logger.warning(f"AI rate limit exceeded: {str(e)}")
                 return "I'm currently handling many requests. Please try again in a few seconds."
 
@@ -180,6 +182,48 @@ class AIService:
 
         # This should never be reached due to the loop logic, but mypy requires it
         return "I apologize, but I'm having trouble processing your request right now. Could you please try again?"
+
+    def _generate_content_sync(self, prompt: str) -> str:
+        """Synchronous wrapper for Gemini content generation."""
+        try:
+            response = self.model.generate_content(
+                prompt,
+                generation_config=genai.types.GenerationConfig(
+                    candidate_count=1,
+                    temperature=0.7,
+                    max_output_tokens=500,
+                ),
+            )
+            return response.text.strip()
+        except Exception as e:
+            logger.error(f"Gemini generation error: {str(e)}")
+            raise
+
+    def _build_gemini_prompt(
+        self, system_prompt: str, conversation_history: List[Dict[str, str]], user_message: str
+    ) -> str:
+        """
+        Build a single prompt for Gemini combining system prompt, conversation history, and user message.
+        
+        Gemini doesn't use role-based messages like OpenAI, so we format everything into a single prompt.
+        """
+        prompt_parts = [
+            "System Instructions:",
+            system_prompt,
+            "\n---\n",
+            "Conversation History:",
+        ]
+        
+        # Add conversation history
+        for msg in conversation_history:
+            role = "Assistant" if msg["role"] == "assistant" else "User"
+            prompt_parts.append(f"{role}: {msg['content']}")
+        
+        # Add current user message
+        prompt_parts.append(f"\nUser: {user_message}")
+        prompt_parts.append("\nAssistant:")
+        
+        return "\n".join(prompt_parts)
 
     def _create_system_prompt(self, available_units: List[Unit], prospect_data) -> str:
         """Create comprehensive system prompt with property and inventory context."""
