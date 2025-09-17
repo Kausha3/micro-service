@@ -174,11 +174,17 @@ function ChatWidget() {
       timestamp: new Date().toISOString(),
     }
 
-    // Add user message immediately
-    setMessages(prev => [...prev, userMessage])
+    // Clear input and set loading state immediately
     setInputValue('')
     setIsLoading(true)
     setError(null)
+
+    // Add user message immediately and get updated messages for storage
+    let updatedMessagesWithUser
+    setMessages(prev => {
+      updatedMessagesWithUser = [...prev, userMessage]
+      return updatedMessagesWithUser
+    })
 
     try {
       const response = await axios.post(`${API_BASE_URL}/chat`, {
@@ -194,9 +200,12 @@ function ChatWidget() {
         timestamp: new Date().toISOString(),
       }
 
-      // Add assistant response to existing messages (user message already added)
-      setMessages(prev => [...prev, assistantMessage])
-      const updatedMessages = [...messages, userMessage, assistantMessage]
+      // Add assistant response and get final updated messages for storage
+      let finalUpdatedMessages
+      setMessages(prev => {
+        finalUpdatedMessages = [...prev, assistantMessage]
+        return finalUpdatedMessages
+      })
 
       // Update session ID if provided
       const currentSessionId = response.data.session_id || sessionId
@@ -204,8 +213,8 @@ function ChatWidget() {
         setSessionId(response.data.session_id)
       }
 
-      // Save updated session to storage
-      saveSessionToStorage(currentSessionId, updatedMessages)
+      // Save updated session to storage with the final messages
+      saveSessionToStorage(currentSessionId, finalUpdatedMessages)
 
     } catch (error) {
       console.error('Failed to send message:', error)
@@ -273,10 +282,16 @@ function ChatWidget() {
       timestamp: new Date().toISOString(),
     }
 
-    // Add user message immediately
-    setMessages(prev => [...prev, userMessage])
+    // Set loading state immediately
     setIsLoading(true)
     setError(null)
+
+    // Add user message immediately and get updated messages for storage
+    let updatedMessagesWithUser
+    setMessages(prev => {
+      updatedMessagesWithUser = [...prev, userMessage]
+      return updatedMessagesWithUser
+    })
 
     try {
       const response = await axios.post(`${API_BASE_URL}/chat`, {
@@ -292,9 +307,12 @@ function ChatWidget() {
         timestamp: new Date().toISOString(),
       }
 
-      // Add assistant response to existing messages
-      setMessages(prev => [...prev, assistantMessage])
-      const updatedMessages = [...messages, userMessage, assistantMessage]
+      // Add assistant response and get final updated messages for storage
+      let finalUpdatedMessages
+      setMessages(prev => {
+        finalUpdatedMessages = [...prev, assistantMessage]
+        return finalUpdatedMessages
+      })
 
       // Update session ID if provided
       const currentSessionId = response.data.session_id || sessionId
@@ -302,8 +320,8 @@ function ChatWidget() {
         setSessionId(response.data.session_id)
       }
 
-      // Save updated session to storage
-      saveSessionToStorage(currentSessionId, updatedMessages)
+      // Save updated session to storage with the final messages
+      saveSessionToStorage(currentSessionId, finalUpdatedMessages)
 
     } catch (error) {
       console.error('Failed to send apartment selection:', error)
