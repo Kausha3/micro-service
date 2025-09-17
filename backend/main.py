@@ -165,6 +165,7 @@ app.add_middleware(
 
 # Register route handlers
 app.get("/")(routes.root)
+app.get("/health")(routes.health)
 app.post("/chat", response_model=ChatResponse)(routes.chat_endpoint)
 
 

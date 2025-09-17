@@ -20,6 +20,27 @@ from ai_service import get_ai_service
 logger = logging.getLogger(__name__)
 
 
+async def health():
+    """
+    Simple Health Check Endpoint
+
+    A lightweight endpoint specifically designed for health checks and wake-up pings.
+    This endpoint is optimized for monitoring systems and frontend wake-up calls.
+
+    **Use Cases:**
+    - Health monitoring and uptime checks
+    - Frontend wake-up pings for cold start mitigation
+    - Load balancer health checks
+    - Service discovery
+
+    **Tags:** Health
+
+    Returns:
+        dict: Simple health status response
+    """
+    return {"status": "ok"}
+
+
 async def root():
     """
     API Health Check and Information
